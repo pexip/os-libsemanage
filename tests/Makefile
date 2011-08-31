@@ -5,7 +5,7 @@ SOURCES = $(wildcard *.c)
 TESTSRC=../src
 
 # Add the required external object files here:
-LIBS = ../src/libsemanage.a ../../libselinux/src/libselinux.a ../../libsepol/src/libsepol.a
+LIBS = ../src/libsemanage.a /usr/lib/libselinux.a /usr/lib/libsepol.a
 
 ###########################################################################
 
