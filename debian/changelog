@@ -1,3 +1,9 @@
+libsemanage (2.1.0-2pexip1) pexip; urgency=low
+
+  * Prepare Pexip packaging
+
+ -- John-Mark Bell <jmb@pexip.com>  Wed, 25 Dec 2013 12:18:56 +0000
+
 libsemanage (2.1.0-2) unstable; urgency=low
 
   * s/policymanagement/policy management/ and removed needless space

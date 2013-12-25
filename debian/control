@@ -3,13 +3,15 @@ VCS-Git: git://git.debian.org/~srivasta/debian/libsemanage.git
 VCS-Browser: http://git.debian.org/git/?p=users/srivasta/debian/libsemanage.git
 Priority: optional
 Section: libdevel
-Maintainer: Russell Coker <russell@coker.com.au>
-Uploaders: Manoj Srivastava <srivasta@debian.org>
+Maintainer: Pexip AS <packaging@pexip.com>
+XSBC-Pexip-Original-Maintainer: Russell Coker <russell@coker.com.au>
+XSBC-Pexip-Original-Uploaders: Manoj Srivastava <srivasta@debian.org>
 Standards-Version: 3.8.4.0
 Build-Depends: bison, flex, libselinux1-dev (>= 2.1.0),
    libsepol1-dev (>= 2.1.0), python-all-dev (>= 2.3.5-11),
    file, libustr-dev, swig, libbz2-dev, ruby1.8-dev, ruby
 XS-Python-Version: >= 2.5
+XS-Pexip-Upstream: http://archive.ubuntu.com/ubuntu/ precise
 
 
 Package: libsemanage-common
