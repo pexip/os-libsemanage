@@ -59,13 +59,13 @@ enum semanage_sandbox_defs {
 	SEMANAGE_NC,
 	SEMANAGE_FC_HOMEDIRS,
 	SEMANAGE_DISABLE_DONTAUDIT,
+	SEMANAGE_PRESERVE_TUNABLES,
 	SEMANAGE_STORE_NUM_PATHS
 };
 
 /* FIXME: this needs to be made a module store specific init and the
  * global configuration moved to another file.
  */
-const char *semanage_conf_path(void);
 int semanage_check_init(const char *root);
 
 extern const char *semanage_fname(enum semanage_sandbox_defs file_enum);
@@ -75,7 +75,7 @@ extern const char *semanage_path(enum semanage_store_defs store,
 
 int semanage_create_store(semanage_handle_t * sh, int create);
 
-int semanage_store_access_check(semanage_handle_t * sh);
+int semanage_store_access_check(void);
 
 int semanage_remove_directory(const char *path);
 
@@ -85,6 +85,8 @@ int semanage_get_modules_names(semanage_handle_t * sh,
 			       char ***filenames, int *len);
 
 int semanage_module_enabled(const char *file);
+int semanage_enable_module(const char *file);
+int semanage_disable_module(const char *file);
 /* lock file routines */
 int semanage_get_trans_lock(semanage_handle_t * sh);
 int semanage_get_active_lock(semanage_handle_t * sh);
@@ -128,7 +130,5 @@ int semanage_nc_sort(semanage_handle_t * sh,
 		     const char *buf,
 		     size_t buf_len,
 		     char **sorted_buf, size_t * sorted_buf_len);
-
-extern const char *DISABLESTR;
 
 #endif

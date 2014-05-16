@@ -76,6 +76,7 @@ libsemanage.so.1 libsemanage1 #MINVER#
  semanage_fcontext_set_expr@LIBSEMANAGE_1.0 2.0.3
  semanage_fcontext_set_type@LIBSEMANAGE_1.0 2.0.3
  semanage_get_disable_dontaudit@LIBSEMANAGE_1.0 2.0.33
+ semanage_get_preserve_tunables@LIBSEMANAGE_1.0 2.1.6
  semanage_handle_create@LIBSEMANAGE_1.0 2.0.3
  semanage_handle_destroy@LIBSEMANAGE_1.0 2.0.3
  semanage_iface_clone@LIBSEMANAGE_1.0 2.0.3
@@ -193,8 +194,10 @@ libsemanage.so.1 libsemanage1 #MINVER#
  semanage_set_check_contexts@LIBSEMANAGE_1.0 2.0.40
  semanage_set_create_store@LIBSEMANAGE_1.0 2.0.3
  semanage_set_disable_dontaudit@LIBSEMANAGE_1.0 2.0.25
+ semanage_set_preserve_tunables@LIBSEMANAGE_1.0 2.1.6
  semanage_set_rebuild@LIBSEMANAGE_1.0 2.0.3
  semanage_set_reload@LIBSEMANAGE_1.0 2.0.3
+ semanage_set_root@LIBSEMANAGE_1.0 2.1.6
  semanage_seuser_clone@LIBSEMANAGE_1.0 2.0.3
  semanage_seuser_compare2@LIBSEMANAGE_1.0 2.0.3
  semanage_seuser_compare@LIBSEMANAGE_1.0 2.0.3

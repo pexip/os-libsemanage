@@ -1,3 +1,157 @@
+libsemanage (2.3-1) unstable; urgency=medium
+
+  * Team upload.
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+  * debian/rules: Do not require ruby or python dh helpers when bootstrapping
+  * debian/rules: Rework the makefile, it should handle changes in the
+    supported ruby versions by binNMU now (Closes: #747685)
+  * debian/rules: Fix path in the override_dh_fixperms target
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 16 May 2014 16:27:12 +0200
+
+libsemanage (2.2-2) unstable; urgency=medium
+
+  * Team upload.
+  [ Hideki Yamane ]
+  * debian/{rules,ruby-semanage.install}
+    - remove ruby1.9.1 (however, it's just a workaround since it specifies
+      only ruby2.0, and we'll move to ruby2.1) (Closes: #746025)
+
+  [ Laurent Bigonville ]
+  * debian/rules: Build ruby 2.1 bindings too
+  * debian/control: Bump Standards-Version to 3.9.5 (no further changes)
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 02 May 2014 02:06:36 +0200
+
+libsemanage (2.2-1) unstable; urgency=low
+
+  * Team upload.
+  * New upstream release
+    - Drop debian/patches/max-uid: Merged upstream
+    - Drop debian/patches/fix_swig_python_exception.patch: Merged upstream
+    - debian/control:
+      + Bump {build-}dependencies to match new release
+      + Add libaudit-dev to the build-dependencies
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 01 Nov 2013 23:24:34 +0100
+
+libsemanage (2.1.10-3) unstable; urgency=low
+
+  * Team upload.
+  * debian/patches/disable-expand-check.patch: Disable expand-check option by
+    default to speedup semodule operations (Closes: #724999)
+  * debian/control: Bump Standards-Version to 3.9.4 (no further changes)
+  * debian/rules: Stop building binding for ruby 1.8 and start building it for
+    ruby 2.0 (Closes: #720220)
+  * debian/control, debian/rules: Drop libsemanage-ruby1.8 transitional
+    package
+  * debian/control: Use canonical URL for VCS-Git field
+
+ -- Laurent Bigonville <bigon@debian.org>  Wed, 02 Oct 2013 21:25:16 +0200
+
+libsemanage (2.1.10-2) unstable; urgency=low
+
+  * Team upload.
+  * debian/control: Add Build-dependency against pkg-config
+  * debian/rules: Do not build the bindings if we are in "stage1", this help to
+    bootstrap new architectures (Closes: #708404)
+  * debian/rules: Fix FTBFS with multiarched python
+  * debian/patches/fix_swig_python_exception.patch: Fix the generation of the
+    semanageswig_python_exception.i file
+
+ -- Laurent Bigonville <bigon@debian.org>  Mon, 20 May 2013 19:21:45 +0200
+
+libsemanage (2.1.10-1) unstable; urgency=low
+
+  * Team upload.
+  * New upstream release
+    - debian/control: Bump (build-) dependencies to match the release
+    - debian/patches/max-uid: Refreshed
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 10 May 2013 00:04:07 +0200
+
+libsemanage (2.1.9-1) experimental; urgency=low
+
+  * Team upload.
+  * New upstream release
+    - Drop debian/patches/fallback-user-level, applied upstream
+    - Drop debian/patches/no-link-libpython.patch, applied upstream
+    - Refreshed debian/patches/makefile
+    - Drop debian/patches/prefix-rubymodule.patch, applied upstream
+    - Drop debian/patches/python-semanage-make, not needed anymore
+    - debian/patches/max-uid: Drop useless changes
+    - Bump libsepol1 and libselinux1 {build-}dependencies
+    - debian/rules: Also pass RUBYINC for ruby 1.8 and add missing -I for 1.9
+    - Drop debian/patches/makefile, not needed anymore
+  * Update debian/watch file
+  * debian/gbp.conf: Change the debian-branch to "debian" instead of "upstream"
+
+ -- Laurent Bigonville <bigon@debian.org>  Wed, 26 Sep 2012 14:38:38 +0200
+
+libsemanage (2.1.6-6) unstable; urgency=low
+
+  * Team upload.
+  * Do not Conflicts with ruby transitional package, use versionized Breaks
+    instead (Closes: #667066)
+  * debian/gbp.conf: Change default git-buildpackage build-directory
+
+ -- Laurent Bigonville <bigon@debian.org>  Sun, 10 Jun 2012 08:47:37 +0200
+
+libsemanage (2.1.6-5) unstable; urgency=low
+
+  * Team upload.
+  * debian/rules: Do not make tests failures fatal
+
+ -- Laurent Bigonville <bigon@debian.org>  Thu, 29 Mar 2012 15:44:35 +0200
+
+libsemanage (2.1.6-4) unstable; urgency=low
+
+  * Team upload.
+  * debian/control: Re-add Conflicts/Provides for the libsemanage1-dev package
+  * debian/rules: Fix FTBFS, all architectures are not x86_64-linux
+
+ -- Laurent Bigonville <bigon@debian.org>  Wed, 28 Mar 2012 22:05:33 +0200
+
+libsemanage (2.1.6-3) unstable; urgency=low
+
+  * Team upload.
+  * Switch to dh sequence, dh_python2, new ruby policy and multiarch
+  * debian/control:
+    - Bump Standards-Version to 3.9.3 (no further changes)
+    - Drop useless Conflicts/Replaces/Provides
+    - Add missing dependencies on the -dev package
+    - Add Homepage field
+    - Fix short Description to please lintian
+    - Update Vcs-* fields
+    - Add strict version on dependency against libsemanage-common
+    - Make binary packages arch:linux-any
+    - Put under the Debian SELinux team maintenance
+  * Move semanage.conf manpage to libsemanage-common package
+  * Add debian/gbp.conf file
+  * debian/rules: Append CPPFLAGS hardening flags to CFLAGS as build system is
+    not using CPPFLAGS
+
+ -- Laurent Bigonville <bigon@debian.org>  Tue, 27 Mar 2012 17:33:12 +0200
+
+libsemanage (2.1.6-2) unstable; urgency=low
+
+  * Make the python shared objects build correctly.
+
+ -- Russell Coker <russell@coker.com.au>  Tue, 28 Feb 2012 16:12:45 +1100
+
+libsemanage (2.1.6-1) unstable; urgency=low
+
+  * New upstream version, add support for MCS/MLS levels for restorecon and
+    lots of little changes.
+  * Added new symbols semanage_get_preserve_tunables,
+    semanage_set_preserve_tunables, and semanage_set_root.
+  * Removed more generated files in the clean process.
+  * Made tests/Makefile multi-arch aware.
+  * Switch to dpkg-source 3.0 (quilt) format
+
+ -- Russell Coker <russell@coker.com.au>  Mon, 20 Feb 2012 18:27:21 +1100
+
 libsemanage (2.1.0-2) unstable; urgency=low
 
   * s/policymanagement/policy management/ and removed needless space
