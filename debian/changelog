@@ -1,3 +1,74 @@
+libsemanage (2.6-2) unstable; urgency=medium
+
+  * Team upload.
+  * debian/patches/fix_use-after-free_python3.patch: Fix use-after-free when
+    using python3 bindings, this was preventing to modify/delete login
+    mappings, from upstream (Closes: #848232)
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 30 Dec 2016 16:42:09 +0100
+
+libsemanage (2.6-1) unstable; urgency=medium
+
+  * Team upload.
+  * New upstream release
+    - Make the build reproducible (Closes: #825674)
+    - debian/control: Bump {build-}dependencies to match new release
+  * debian/libsemanage1.symbols: Add the Build-Depends-Package field
+  * debian/gbp.conf: Rename git-buildpackage section to buildpackage
+
+ -- Laurent Bigonville <bigon@debian.org>  Sat, 29 Oct 2016 19:47:52 +0200
+
+libsemanage (2.5-1) unstable; urgency=medium
+
+  * Team upload.
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+    - debian/patches/semigrate-store.patch: Refreshed
+    - debian/libsemanage1.symbols: Add new exported symbol
+  * debian/gbp.conf: Sign tags by default
+  * debian/control: Bump Standards-Version to 3.9.8 (no further changes)
+  * debian/control: Update the Vcs-* URL's to please lintian (again)
+
+ -- Laurent Bigonville <bigon@debian.org>  Mon, 25 Apr 2016 20:14:10 +0200
+
+libsemanage (2.4-3) unstable; urgency=medium
+
+  * Team upload.
+  * Upload to unstable
+  * debian/control:
+    - Add a Breaks against policycoreutils << 2.4, if the package is installed,
+      let's be sure we have the correct version.
+    - Add Breaks against the policy packages, libsemanage 2.4 introduce a new
+      location for the policy store and the maintainer scripts from the policy
+      packages need to be adjusted.
+
+ -- Laurent Bigonville <bigon@debian.org>  Thu, 19 Nov 2015 01:58:47 +0100
+
+libsemanage (2.4-2) experimental; urgency=medium
+
+  * Team upload.
+  * Create a new semanage-utils package and install semanage_migrate_store
+    utility in it. This utility can be used to migrate the policy store to the
+    new format and location.
+  * Add d/p/semigrate-store.patch: Fix the soname of the libsepol library and
+    debianize the name of the packages to install in an error message
+
+ -- Laurent Bigonville <bigon@debian.org>  Tue, 27 Oct 2015 17:12:24 +0100
+
+libsemanage (2.4-1) experimental; urgency=medium
+
+  * Team upload.
+  * New upstream release
+    - debian/patches/disable-expand-check.patch: Refreshed
+    - debian/control: Bump {build-}dependencies to match new release
+    - Adjust the debian/libsemanage1.symbols file
+  * debian/watch: Update watch file URL
+  * debian/control: Bump Standards-Version to 3.9.6 (no further changes)
+  * Do not look for hll compiler in /usr/libexec
+  * Start building python3 packages
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 31 Jul 2015 16:21:13 +0200
+
 libsemanage (2.3-1) unstable; urgency=medium
 
   * Team upload.

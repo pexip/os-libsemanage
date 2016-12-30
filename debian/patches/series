@@ -1,2 +1,5 @@
 tests-makefile
 disable-expand-check.patch
+libexec-path.patch
+semigrate-store.patch
+fix_use-after-free_python3.patch
