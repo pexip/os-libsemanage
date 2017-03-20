@@ -37,6 +37,161 @@
 #include "semanage_store.h"
 
 #define SEMANAGE_COMMIT_READ_WAIT 5
+#define SEMANAGE_CONF_PATH "/etc/selinux/semanage.conf"
+
+#include <string.h>
+#include <selinux/selinux.h>
+static char *private_selinux_path = NULL;
+static char *private_semanage_conf_path = NULL;
+static char *private_file_context_path = NULL;
+static char *private_file_context_local_path = NULL;
+static char *private_file_context_homedir_path = NULL;
+static char *private_homedir_context_path = NULL;
+static char *private_binary_policy_path = NULL;
+static char *private_usersconf_path = NULL;
+static char *private_netfilter_context_path = NULL;
+static char *private_policy_root = NULL;
+
+void semanage_free_root() {
+	free(private_selinux_path); private_selinux_path = NULL;
+	free(private_semanage_conf_path); private_semanage_conf_path = NULL;
+	free(private_file_context_path); private_file_context_path = NULL;
+	free(private_file_context_local_path); private_file_context_local_path = NULL;
+	free(private_file_context_homedir_path); private_file_context_homedir_path = NULL;
+	free(private_homedir_context_path); private_homedir_context_path = NULL;
+	free(private_binary_policy_path); private_binary_policy_path = NULL;
+	free(private_usersconf_path); private_usersconf_path = NULL;
+	free(private_netfilter_context_path); private_netfilter_context_path = NULL;
+	free(private_policy_root); private_policy_root = NULL;
+}
+
+int semanage_set_root(const char *path) {
+	semanage_free_root();
+	if ( asprintf(&private_selinux_path, "%s/%s", path, selinux_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_semanage_conf_path, "%s/%s", path, SEMANAGE_CONF_PATH) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_file_context_path, "%s/%s", path, selinux_file_context_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_file_context_local_path, "%s/%s", path, selinux_file_context_local_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_homedir_context_path, "%s/%s", path, selinux_homedir_context_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_file_context_homedir_path, "%s/%s", path, selinux_file_context_homedir_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_binary_policy_path, "%s/%s", path, selinux_binary_policy_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_usersconf_path, "%s/%s", path, selinux_usersconf_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_netfilter_context_path, "%s/%s", path, selinux_netfilter_context_path()) < 0 ) {
+		goto error;
+	}
+
+	if ( asprintf(&private_policy_root, "%s/%s", path, selinux_policy_root()) < 0 ) {
+		goto error;
+	}
+
+	return 0;
+error:
+	semanage_free_root();
+	return -1;
+}
+hidden_def(semanage_set_root)
+
+const char *semanage_file_context_path() {
+//	printf("private_file_context_path %s\n", private_file_context_path);
+	if (private_file_context_path)
+		return private_file_context_path;
+	return selinux_file_context_path();
+}
+
+const char *semanage_file_context_local_path() {
+//	printf("private_file_context_local_path %s\n", private_file_context_local_path);
+	if (private_file_context_local_path)
+		return private_file_context_local_path;
+	return selinux_file_context_local_path();
+}
+
+const char *semanage_file_context_homedir_path() {
+//	printf("private_file_context_homedir_path %s\n", private_file_context_homedir_path);
+	if (private_file_context_homedir_path)
+		return private_file_context_homedir_path;
+
+	return selinux_file_context_homedir_path();
+}
+
+const char *semanage_homedir_context_path() {
+//	printf("private_homedir_context_path %s\n", private_homedir_context_path);
+	if (private_homedir_context_path)
+		return private_homedir_context_path;
+	return selinux_homedir_context_path();
+}
+
+const char *semanage_binary_policy_path() {
+//	printf("private_binary_policy_path %s\n", private_binary_policy_path);
+	if (private_binary_policy_path)
+		return private_binary_policy_path;
+	return selinux_binary_policy_path();
+}
+
+const char *semanage_usersconf_path() {
+//	printf("private_usersconf_path %s\n", private_usersconf_path);
+	if (private_usersconf_path)
+		return private_usersconf_path;
+	return selinux_usersconf_path();
+}
+
+const char *semanage_netfilter_context_path() {
+//	printf("private_netfilter_context_path %s\n", private_netfilter_context_path);
+	if (private_netfilter_context_path)
+		return private_netfilter_context_path;
+	return selinux_netfilter_context_path();
+}
+
+const char *semanage_policy_root() {
+//	printf("private_policy_root %s\n", private_policy_root);
+	if (private_policy_root)
+		return private_policy_root;
+	return selinux_policy_root();
+}
+
+const char *semanage_selinux_path(void) {
+//	printf("private_selinux_path %s\n", private_selinux_path);
+	if (private_selinux_path)
+		return private_selinux_path;
+	return selinux_path();
+}
+
+/* Return a fully-qualified path + filename to the semanage
+ * configuration file.  The caller must not alter the string returned
+ * (and hence why this function return type is const).
+ *
+ */
+
+const char *semanage_conf_path(void)
+{
+	if (private_semanage_conf_path &&
+	    access(private_semanage_conf_path, R_OK) == 0)
+		return private_semanage_conf_path;
+
+	return SEMANAGE_CONF_PATH;
+}
 
 semanage_handle_t *semanage_handle_create(void)
 {
@@ -126,6 +281,19 @@ void semanage_set_disable_dontaudit(semanage_handle_t * sh, int disable_dontaudi
 	
 	sepol_set_disable_dontaudit(sh->sepolh, disable_dontaudit);
 	return;
+}
+
+int semanage_get_preserve_tunables(semanage_handle_t * sh)
+{
+	assert(sh != NULL);
+	return sepol_get_preserve_tunables(sh->sepolh);
+}
+
+void semanage_set_preserve_tunables(semanage_handle_t * sh,
+				    int preserve_tunables)
+{
+	assert(sh != NULL);
+	sepol_set_preserve_tunables(sh->sepolh, preserve_tunables);
 }
 
 void semanage_set_check_contexts(semanage_handle_t * sh, int do_check_contexts)
