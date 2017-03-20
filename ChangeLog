@@ -1,3 +1,77 @@
+2.3 2014-05-06
+	* Fix memory leak in semanage_genhomedircon from Thomas Hurd.
+
+2.2 2013-10-30
+	* Avoid duplicate list entries from Dan Walsh.
+	* Add audit support to libsemanage from Dan Walsh.
+	* Remove policy.kern and replace with symlink from Dan Walsh.
+	* Apply a MAX_UID check for genhomedircon from Laurent Bigonville.
+	* Fix man pages from Laurent Bigonville.
+
+2.1.10 2013-02-01
+	* Add sefcontext_compile to compile regex everytime policy is rebuilt
+	* Cleanup/fix enable/disable/remove module.
+	* redo genhomedircon minuid
+	* fixes from coverity
+	* semanage_store: do not leak memory in semanage_exec_prog
+	* genhomedircon: remove useless conditional in get_home_dirs
+	* genhomedircon: double free in get_home_dirs
+	* fcontext_record: do not leak on error in semanage_fcontext_key_create
+	* genhomedircon: do not leak on failure in write_gen_home_dir_context
+	* semanage_store: do not leak fd 
+	* genhomedircon: do not leak shells list
+	* semanage_store: do not leak on strdup failure 
+	* semanage_store: rewrite for readability
+
+2.1.9 2012-09-13
+	* libsemanage: do not set soname needlessly
+	* libsemanage: remove PYTHONLIBDIR and ruby equivalent
+	* do boolean name substitution
+	* Fix segfault for building standard policies.
+
+2.1.8 2012-06-28
+	* remove build warning when build swig c files
+	* additional makefile support for rubywrap
+	* ignore 80 column limit for readability
+	* semanage_store: fix snprintf length argument by using asprintf
+	* Use default semanage.conf as a fallback
+	* use after free in python bindings
+
+2.1.7 2012-03-28
+	* Alternate path for semanage.conf
+	* do not link against libpython, this is considered bad in Debian
+	* Allow to build for several ruby version
+	* fallback-user-level
+
+2.1.6 2011-12-21
+	* add ignoredirs config for genhomedircon
+	* Fallback_user_level can be NULL if you are not using MLS
+
+2.1.5 2011-11-03
+	* regenerate .pc on VERSION change
+	* maintain mode even if umask is tighter
+	* semanage.conf man page
+	* create man5dir if not exist
+
+2.1.4 2011-09-15
+	* Create a new preserve_tunables flag
+	* tree: default make target to all not
+	* fix semanage_store_access_check calling arguments
+
+2.1.3 2011-08-26
+	* python wrapper makefile changes
+
+2.1.2 2011-08-17
+	* print error debug info for buggy fc
+	* introduce semanage_set_root and friends
+	* throw exceptions in python rather than return
+	* python3 support.
+	* patch for MCS/MLS in user files
+
+2.1.1 2011-08-01
+	* Remove generated files, expand .gitignore
+	* Use -Werror and change a few prototypes to support it
+
 2.1.0 2011-07-27
 	* Release, minor version bump
 

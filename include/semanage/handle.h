@@ -126,6 +126,15 @@ int semanage_is_connected(semanage_handle_t * sh);
 /* returns 1 if policy is MLS, 0 otherwise. */
 int semanage_mls_enabled(semanage_handle_t *sh);
 
+/* Change to alternate selinux root path */
+int semanage_set_root(const char *path);
+
+/* Get whether or not needless unused branch of tunables would be preserved */
+int semanage_get_preserve_tunables(semanage_handle_t * handle);
+
+/* Set whether or not to preserve the needless unused branch of tunables */
+void semanage_set_preserve_tunables(semanage_handle_t * handle, int preserve_tunables);
+
 /* META NOTES
  *
  * For all functions a non-negative number indicates success. For some

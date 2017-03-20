@@ -113,6 +113,61 @@ typedef struct {
 	int matched;
 } fc_match_handle_t;
 
+typedef struct IgnoreDir {
+	struct IgnoreDir *next;
+	char *dir;
+} ignoredir_t;
+
+ignoredir_t *ignore_head = NULL;
+
+static void ignore_free(void) {
+	ignoredir_t *next;
+
+	while (ignore_head) {
+		next = ignore_head->next;
+		free(ignore_head->dir);
+		free(ignore_head);
+		ignore_head = next;
+	}
+}
+
+static int ignore_setup(char *ignoredirs) {
+	char *tok;
+	ignoredir_t *ptr = NULL; 
+
+	tok = strtok(ignoredirs, ";");
+	while(tok) {
+		ptr = calloc(sizeof(ignoredir_t),1);
+		if (!ptr)
+			goto err;
+		ptr->dir = strdup(tok);
+		if (!ptr->dir)
+			goto err;
+
+		ptr->next = ignore_head;
+		ignore_head = ptr;
+
+		tok = strtok(NULL, ";");
+	}
+
+	return 0;
+err:
+	free(ptr);
+	ignore_free();
+	return -1;
+}
+
+static int ignore(const char *homedir) {
+	ignoredir_t *ptr = ignore_head;
+	while (ptr) {
+		if (strcmp(ptr->dir, homedir) == 0) {
+			return 1;
+		}
+		ptr = ptr->next;
+	}
+	return 0;
+}
+
 static semanage_list_t *default_shell_list(void)
 {
 	semanage_list_t *list = NULL;
@@ -228,14 +283,11 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 	char *rbuf = NULL;
 	char *path = NULL;
 	long rbuflen;
-	uid_t temp, minuid = 0, maxuid = 0;
-	int minuid_set = 0, maxuid_set = 0;
+	uid_t temp, minuid = 500, maxuid = 60000;
+	int minuid_set = 0;
 	struct passwd pwstorage, *pwbuf;
 	struct stat buf;
 	int retval;
-
-	shells = get_shell_list();
-	assert(shells);
 
 	path = semanage_findval(PATH_ETC_USERADD, "HOME", "=");
 	if (path && *path) {
@@ -269,23 +321,22 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 	if (!(s->usepasswd))
 		return homedir_list;
 
+	shells = get_shell_list();
+	assert(shells);
+
 	path = semanage_findval(PATH_ETC_LOGIN_DEFS, "UID_MIN", NULL);
 	if (path && *path) {
 		temp = atoi(path);
-		if (!minuid_set || temp < minuid) {
-			minuid = temp;
-			minuid_set = 1;
-		}
+		minuid = temp;
+		minuid_set = 1;
 	}
 	free(path);
 	path = NULL;
+
 	path = semanage_findval(PATH_ETC_LOGIN_DEFS, "UID_MAX", NULL);
 	if (path && *path) {
 		temp = atoi(path);
-		if (!maxuid_set || temp > maxuid) {
-			maxuid = temp;
-			maxuid_set = 1;
-		}
+		maxuid = temp;
 	}
 	free(path);
 	path = NULL;
@@ -300,15 +351,6 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 	}
 	free(path);
 	path = NULL;
-
-	if (!minuid_set) {
-		minuid = 500;
-		minuid_set = 1;
-	}
-	if (!maxuid_set) {
-		maxuid = 60000;
-		maxuid_set = 1;
-	}
 
 	rbuflen = sysconf(_SC_GETPW_R_SIZE_MAX);
 	if (rbuflen <= 0)
@@ -327,6 +369,8 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 			pwbuf->pw_dir[len] = '\0';
 		}
 		if (strcmp(pwbuf->pw_dir, "/") == 0)
+			continue;
+		if (ignore(pwbuf->pw_dir))
 			continue;
 		if (semanage_str_count(pwbuf->pw_dir, '/') <= 1)
 			continue;
@@ -349,7 +393,7 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 
 			/* NOTE: old genhomedircon printed a warning on match */
 			if (hand.matched) {
-			  WARN(s->h_semanage, "%s homedir %s or its parent directory conflicts with a file context already specified in the policy.  This usually indicates an incorrectly defined system account.  If it is a system account please make sure its uid is less than %u or greater than %u or its login shell is /sbin/nologin.", pwbuf->pw_name, pwbuf->pw_dir, minuid, maxuid);
+				WARN(s->h_semanage, "%s homedir %s or its parent directory conflicts with a file context already specified in the policy.  This usually indicates an incorrectly defined system account.  If it is a system account please make sure its uid is less than %u or greater than %u or its login shell is /sbin/nologin.", pwbuf->pw_name, pwbuf->pw_dir, minuid, maxuid);
 			} else {
 				if (semanage_list_push(&homedir_list, path))
 					goto fail;
@@ -363,11 +407,13 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 		WARN(s->h_semanage, "Error while fetching users.  "
 		     "Returning list so far.");
 	}
+
+	if (semanage_list_sort(&homedir_list))
+		goto fail;
+
 	endpwent();
 	free(rbuf);
 	semanage_list_destroy(&shells);
-	if (semanage_list_sort(&homedir_list))
-		goto fail;
 
 	return homedir_list;
 
@@ -381,11 +427,10 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 }
 
 /**
- * @param	s	settings structure, stores various paths etc. Must never be NULL
  * @param	out	the FILE to put all the output in.
  * @return	0 on success
  */
-static int write_file_context_header(genhomedircon_settings_t * s, FILE * out)
+static int write_file_context_header(FILE * out)
 {
 	if (fprintf(out, COMMENT_FILE_CONTEXT_HEADER) < 0) {
 		return STATUS_ERR;
@@ -629,12 +674,9 @@ static int push_user_entry(genhomedircon_user_entry_t ** list, const char *n,
 	home = strdup(h);
 	if (!home)
 		goto cleanup;
-	if(l)
-	{
-		level = strdup(l);
-		if (!level)
-			goto cleanup;
-	}
+	level = strdup(l);
+	if (!level)
+		goto cleanup;
 
 	temp->name = name;
 	temp->sename = sename;
@@ -678,17 +720,17 @@ static int set_fallback_user(genhomedircon_settings_t *s, const char *user,
 {
 	char *fallback_user = strdup(user);
 	char *fallback_user_prefix = strdup(prefix);
-	char *fallback_user_level;
+	char *fallback_user_level = NULL;
+	if (level) 
+		fallback_user_level = strdup(level);
 
-	if (fallback_user == NULL || fallback_user_prefix == NULL) {
+	if (fallback_user == NULL || fallback_user_prefix == NULL ||
+	    (fallback_user_level == NULL && level != NULL)) {
 		free(fallback_user);
 		free(fallback_user_prefix);
 		free(fallback_user_level);
 		return STATUS_ERR;
 	}
-
-	if(level)
-		fallback_user_level = strdup(level);
 
 	free(s->fallback_user);
 	free(s->fallback_user_prefix);
@@ -704,7 +746,7 @@ static int setup_fallback_user(genhomedircon_settings_t * s)
 	semanage_seuser_t **seuser_list = NULL;
 	unsigned int nseusers = 0;
 	semanage_user_key_t *key = NULL;
-	semanage_user_t *the_user = NULL;
+	semanage_user_t *u = NULL;
 	const char *name = NULL;
 	const char *seuname = NULL;
 	const char *prefix = NULL;
@@ -730,22 +772,24 @@ static int setup_fallback_user(genhomedircon_settings_t * s)
 				errors = STATUS_ERR;
 				break;
 			}
-			if (semanage_user_query(s->h_semanage, key, &the_user) < 0)
+			if (semanage_user_query(s->h_semanage, key, &u) < 0)
 			{
 				prefix = name;
 				level = FALLBACK_USER_LEVEL;
 			}
 			else
 			{
-				prefix = semanage_user_get_prefix(the_user);
-				level = semanage_user_get_mlslevel(the_user);
+				prefix = semanage_user_get_prefix(u);
+				level = semanage_user_get_mlslevel(u);
+				if (!level)
+					level = FALLBACK_USER_LEVEL;
 			}
 
 			if (set_fallback_user(s, seuname, prefix, level) != 0)
 				errors = STATUS_ERR;
 			semanage_user_key_free(key);
-			if (the_user)
-				semanage_user_free(the_user);
+			if (u)
+				semanage_user_free(u);
 			break;
 		}
 	}
@@ -822,6 +866,8 @@ static genhomedircon_user_entry_t *get_users(genhomedircon_settings_t * s,
 		if (u) {
 			prefix = semanage_user_get_prefix(*u);
 			level = semanage_user_get_mlslevel(*u);
+			if (!level)
+				level = FALLBACK_USER_LEVEL;
 		} else {
 			prefix = name;
 			level = FALLBACK_USER_LEVEL;
@@ -850,6 +896,8 @@ static genhomedircon_user_entry_t *get_users(genhomedircon_settings_t * s,
 			 * /root */
 			continue;
 		}
+		if (ignore(pwent->pw_dir))
+			continue;
 		if (push_user_entry(&head, name, seuname,
 				    prefix, pwent->pw_dir, level) != STATUS_SUCCESS) {
 			*errors = STATUS_ERR;
@@ -894,16 +942,21 @@ static int write_gen_home_dir_context(genhomedircon_settings_t * s, FILE * out,
 		if (write_home_dir_context(s, out, homedir_context_tpl,
 					   users->name,
 					   users->sename, users->home,
-					   users->prefix, users->level)) {
-			return STATUS_ERR;
-		}
+					   users->prefix, users->level))
+			goto err;
 		if (write_user_context(s, out, user_context_tpl, users->name,
-				       users->sename, users->prefix)) {
-			return STATUS_ERR;
-		}
+				       users->sename, users->prefix))
+			goto err;
 	}
 
 	return STATUS_SUCCESS;
+err:
+	for (; users; pop_user_entry(&users)) {
+	/* the pop function takes care of all the cleanup
+	 * so the loop body is just empty */
+	}
+
+	return STATUS_ERR;
 }
 
 /**
@@ -927,7 +980,7 @@ static int write_context_file(genhomedircon_settings_t * s, FILE * out)
 	if (!homedir_context_tpl && !homeroot_context_tpl && !user_context_tpl)
 		goto done;
 
-	if (write_file_context_header(s, out) != STATUS_SUCCESS) {
+	if (write_file_context_header(out) != STATUS_SUCCESS) {
 		retval = STATUS_ERR;
 		goto done;
 	}
@@ -1001,7 +1054,8 @@ done:
 
 int semanage_genhomedircon(semanage_handle_t * sh,
 			   sepol_policydb_t * policydb,
-			   int usepasswd)
+			   int usepasswd, 
+			   char *ignoredirs)
 {
 	genhomedircon_settings_t s;
 	FILE *out = NULL;
@@ -1016,8 +1070,12 @@ int semanage_genhomedircon(semanage_handle_t * sh,
 	s.fallback_user = strdup(FALLBACK_USER);
 	s.fallback_user_prefix = strdup(FALLBACK_USER_PREFIX);
 	s.fallback_user_level = strdup(FALLBACK_USER_LEVEL);
-	if (s.fallback_user == NULL || s.fallback_user_prefix == NULL || s.fallback_user_level == NULL)
-		return STATUS_ERR;
+	if (s.fallback_user == NULL || s.fallback_user_prefix == NULL || s.fallback_user_level == NULL) {
+		retval = STATUS_ERR;
+		goto done;
+	}
+
+	if (ignoredirs) ignore_setup(ignoredirs);
 
 	s.usepasswd = usepasswd;
 	s.h_semanage = sh;
@@ -1026,15 +1084,20 @@ int semanage_genhomedircon(semanage_handle_t * sh,
 	if (!(out = fopen(s.fcfilepath, "w"))) {
 		/* couldn't open output file */
 		ERR(sh, "Could not open the file_context file for writing");
-		return STATUS_ERR;
+		retval = STATUS_ERR;
+		goto done;
 	}
 
 	retval = write_context_file(&s, out);
 
-	fclose(out);
+done:
+	if (out != NULL)
+		fclose(out);
 
 	free(s.fallback_user);
 	free(s.fallback_user_prefix);
+	free(s.fallback_user_level);
+	ignore_free();
 
 	return retval;
 }

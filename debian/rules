@@ -1,67 +1,77 @@
-#! /usr/bin/make -f
-############################ -*- Mode: Makefile; coding: utf-8 -*- ###########################
-## rules --- 
-## Author           : Manoj Srivastava ( srivasta@glaurung.green-gryphon.com ) 
-## Created On       : Fri Nov 14 12:33:34 2003
-## Created On Node  : glaurung.green-gryphon.com
-## Last Modified By : Manoj Srivastava
-## Last Modified On : Tue Nov 18 17:46:22 2003
-## Last Machine Used: glaurung.green-gryphon.com
-## Update Count     : 70
-## Status           : Unknown, Use with caution!
-## HISTORY          : 
-## Description      : 
-## 
-## arch-tag: 9a5063f4-1e20-4fff-b22a-de94c1e3d954
-## 
-## This program is free software; you can redistribute it and/or modify
-## it under the terms of the GNU General Public License as published by
-## the Free Software Foundation; either version 2 of the License, or
-## (at your option) any later version.
-##
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-##
-## You should have received a copy of the GNU General Public License
-## along with this program; if not, write to the Free Software
-## Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-##
-###############################################################################
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
 
-# Include dpkg-architecture generated variables
-include debian/common/archvars.mk
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-ifneq ($(DEB_HOST_ARCH_OS),linux)
-$(error This is a linux only package. Aborting build.)
+ifeq ($(DEB_STAGE),stage1)
+export DH_OPTIONS += -Nruby-semanage -Npython-semanage
+else
+PYVERSIONS = $(shell pyversions -rv)
+RUBY_VERSIONS := $(shell dh_ruby --print-supported)
 endif
 
-# Set variables with information extracted from control and changelog files
-include debian/common/pkgvars.mk
+# The build system doesn't use CPPFLAGS, pass them to CFLAGS to enable the
+# missing (hardening) flags.
+export DEB_CFLAGS_MAINT_APPEND = $(shell dpkg-buildflags --get CPPFLAGS)
 
-# variables useful for perl packages
-include debian/common/perlvars.mk
+%:
+ifeq ($(DEB_STAGE),stage1)
+	dh $@
+else
+	dh $@ --with python2 --with ruby
+endif
 
-# Install commands
-include debian/common/install_cmds.mk
+override_dh_auto_build:
+	$(MAKE) all LIBBASE="lib/${DEB_HOST_MULTIARCH}"
 
-include debian/local-vars.mk
+ifneq ($(DEB_STAGE),stage1)
+	for version in $(PYVERSIONS); do              \
+	  $(MAKE) pywrap PYTHON=python$$version  \
+	    PYPREFIX=python-$$version;  \
+	done;
 
-include debian/common/copt.mk
+	for version in $(RUBY_VERSIONS); do              \
+	  RUBY_HDRDIR=$$($$version -e 'print RbConfig::CONFIG["rubyhdrdir"]'); \
+	  RUBY_ARCH_HDRDIR=$$($$version -e 'print RbConfig::CONFIG["rubyarchhdrdir"]'); \
+	  RUBY_VERSION=$$($$version -e 'print RbConfig::CONFIG["ruby_version"]'); \
+	  $(MAKE) -C src rubywrap RUBY=$$version RUBYLIBVER=$$RUBY_VERSION \
+	    RUBYINC="-I$$RUBY_HDRDIR -I$$RUBY_ARCH_HDRDIR"; \
+	done;
+endif
 
-include debian/common/automake.mk
+override_dh_auto_install:
+	$(MAKE) install DESTDIR="${CURDIR}/debian/tmp" \
+	  LIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}" \
+	  SHLIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}"
 
+ifneq ($(DEB_STAGE),stage1)
+	for version in $(PYVERSIONS); do              \
+	  $(MAKE) install-pywrap PYTHON=python$$version  \
+	    DESTDIR="${CURDIR}/debian/tmp" \
+	    PYPREFIX=python-$$version;  \
+	done;
 
+	for version in $(RUBY_VERSIONS); do              \
+	  RUBY_VENDOR_ARCHLIB=$$($$version -e 'print RbConfig::CONFIG["vendorarchdir"]'); \
+	  RUBY_VERSION=$$($$version -e 'print RbConfig::CONFIG["ruby_version"]'); \
+	  $(MAKE) -C src install-rubywrap RUBY=$$version RUBYLIBVER=$$RUBY_VERSION DESTDIR="${CURDIR}/debian/tmp" \
+	      RUBYINSTALL="${CURDIR}/debian/tmp/$$RUBY_VENDOR_ARCHLIB"; \
+	done;
+endif
 
-all:
-	@echo nothing to be done
+override_dh_auto_clean:
+ifneq ($(DEB_STAGE),stage1)
+	for version in $(PYVERSIONS); do              \
+	  $(MAKE) clean PYTHON=python$$version;  \
+	done;
+endif
 
-include debian/common/targets.mk
+override_dh_install:
+	dh_install --list-missing
 
-include debian/local.mk
+override_dh_fixperms:
+	dh_fixperms
+	-chmod -x ${CURDIR}/debian/python-semanage/usr/lib/python*/*-packages/semanage.py
 
-
-#Local variables:
-#mode: makefile
-#End:
+override_dh_auto_test:
+	$(MAKE) test || true
