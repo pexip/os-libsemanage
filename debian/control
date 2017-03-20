@@ -11,7 +11,7 @@ Build-Depends: bison, flex, libselinux1-dev (>= 2.1.0),
    libsepol1-dev (>= 2.1.0), python-all-dev (>= 2.3.5-11),
    file, libustr-dev, swig, libbz2-dev, ruby1.8-dev, ruby
 XS-Python-Version: >= 2.5
-XS-Pexip-Upstream: http://archive.ubuntu.com/ubuntu/ precise
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ jessie
 
 
 Package: libsemanage-common
