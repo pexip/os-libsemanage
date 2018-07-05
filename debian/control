@@ -24,7 +24,7 @@ Build-Depends: bison,
 Homepage: http://userspace.selinuxproject.org/
 X-Python-Version: >= 2.5
 XS-Ruby-Versions: all
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ jessie
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
 
 Package: libsemanage-common
 Architecture: all
