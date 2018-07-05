@@ -1,3 +1,77 @@
+2.6 2016-10-14
+	* genhomedircon: do not suppress logging from libsepol, from Stephen Smaley.
+	* genhomedircon: use userprefix as the role for homedir, from Gary Tierney.
+	* Fix linker scripts / map files, from Stephen Smalley.
+	* Fix bug preventing the installation of base modules, from James Carter.
+	* make distclean target work, from Nicolas Iooss.
+	* Do not always print a module name warning, from Miroslav Grepl.
+	* Use pp module name instead of filename when installing module, from Petr Lautrbach.
+	* tests: Do not force using gcc, from Nicolas Iooss.
+	* genhomedircon: remove hardcoded refpolicy strings, from Gary Tierney.
+	* genhomedircon: add support for %group syntax, from Gary Tierney.
+	* genhomedircon: generate contexts for logins mapped to the default user, from Gary Tierney.
+	* Validate and compile file contexts before installing, from Stephen Smalley.
+	* Swap tcp and udp protocol numbers, from Miroslav Vadkerti.
+	* Sort object files for deterministic linking order, from Laurent Bigonville.
+	* Support overriding Makefile RANLIB, from Julien Pivotto.
+	* Respect CC and PKG_CONFIG environment variable, from Julien Pivotto.
+	* Fix multiple spelling errors, from Laurent Bigonville.
+	* genhomedircon: %{USERID} and %{USERNAME} support and code cleanups, from Jason Zaman.
+
+2.5 2016-02-23
+	* Do not overwrite CFLAGS in test Makefile, from Nicolas Iooss.
+	* Fix uninitialized variable in direct_commit and direct_api, from Nicolas Iooss.
+	* semanage_migrate_store: Load libsepol.so.1 instead of libsepol.so, from Laurent Bigonville.
+	* Store homedir_template and users_extra in policy store, from Steve Lawrence
+	* Fix null pointer dereference in semanage_module_key_destroy, from Yuli Khodorkovskiy.
+	* Add semanage_module_extract() to extract a module as CIL or HLL, from Yuli Khodorkovskiy.
+	* semanage_migrate_store: add -r <root> option for migrating inside chroots, from Petr Lautrbach.
+	* Add file_contexts and seusers to the store, from Yuli Khodorkovskiy.
+	* Add policy binary and file_contexts.local to the store, from Yuli Khodorkovskiy.
+	* Allow to install compressed modules without a compression extension,
+	  from Petr Lautrbach.
+	* Do not copy contexts in semanage_migrate_store, from Jason Zaman.
+	* Fix logic in bunzip for uncompressed pp files, from Thomas Hurd.
+	* Fix fname[] initialization in test_utilities.c, from Petr Lautrbach.
+	* Add remove-hll semanage.conf option to remove HLL files after
+	  compilation to CIL, from Yuli Khodorkovskiy
+	* Fix memory leaks when parsing semanage.conf, from Yuli Khodorkovskiy
+	* Change bunzip to use heap instead of stack to prevent segfault on
+	  systems with small stack size, from Thomas Hurd.
+
+2.4 2015-02-02
+	* Fix Makefile to allow LIBDIR and SHLIBDIR to be set to different
+	  directories, from Steve Lawrence
+	* Fix bugs found by hardened gcc flags, from Nicolas Iooss.
+	* Add missing manpage links to security_load_policy, from Laurent
+	  Bigonville.
+	* Fix failing libsemanage pywrap tests, from Nicolas Iooss
+	* Fix deprecation warning for bison, from Ilya Frolov
+	* Skip policy module relink when only setting booleans, from Stephen
+	  Smalley
+	* Fix typo in tests makefile, from Caleb Case
+	* Only try to compile file contexts if they exist, from Steve Lawrence
+	* Fix memory leak when setting a custom store path, from Yuli
+	  Khodorkovskiy
+	* Add semodule option to set store root path in semanage.conf and the
+	  semodule command, from Yuli Khodorkovskiy
+	* Add semanage.conf option to set an alternative root path for policy
+	  store, from Yuli Khodorkovskiy
+	* Add support for High Level Language (HLL) to CIL compilers. The HLL
+	  compiler path is configurable, but should be placed in 
+	  /usr/libexec/selinux/hll by default, from Yuli Khodorkovskiy
+	* Create a policy migration script for migrating the policy store from
+	  /etc/selinux to /var/lib/selinux, from Caleb Case
+	* Add python3 support to the migration script, from Jason Zaman
+	* Use libcil to compile modules, from Steve Lawrence
+	* Use symbolic versioning to maintain ABI compatibility for old install
+	  functions, from Yuli Khodorkovskiy
+	* Add a target-platform option to semanage.conf to control how policies
+	  are built, from Steve Lawrence
+	* Add API to handle modules and source policies, moving module store to
+	  /var/lib/selinux, from Caleb Case
+	* Only try to compile file contexts if they exist, from Steve Lawrence
+
 2.3 2014-05-06
 	* Fix memory leak in semanage_genhomedircon from Thomas Hurd.
 
