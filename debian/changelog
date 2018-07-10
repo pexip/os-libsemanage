@@ -1,3 +1,9 @@
+libsemanage (2.6-2pexip1) pexip; urgency=medium
+
+  * Migrate to Stretch
+
+ -- John-Mark Bell <jmb@pexip.com>  Tue, 10 Jul 2018 11:21:33 +0000
+
 libsemanage (2.6-2) unstable; urgency=medium
 
   * Team upload.
