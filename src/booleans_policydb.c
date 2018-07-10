@@ -33,6 +33,7 @@ typedef struct dbase_policydb dbase_t;
 #include "boolean_internal.h"
 #include "debug.h"
 #include "database_policydb.h"
+#include "semanage_store.h"
 
 /* BOOLEAN RECRORD (SEPOL): POLICYDB extension: method table */
 record_policydb_table_t SEMANAGE_BOOL_POLICYDB_RTABLE = {
@@ -54,7 +55,8 @@ int bool_policydb_dbase_init(semanage_handle_t * handle,
 {
 
 	if (dbase_policydb_init(handle,
-				"policy.kern",
+				semanage_path(SEMANAGE_ACTIVE, SEMANAGE_STORE_KERNEL),
+				semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_KERNEL),
 				&SEMANAGE_BOOL_RTABLE,
 				&SEMANAGE_BOOL_POLICYDB_RTABLE,
 				&dconfig->dbase) < 0)

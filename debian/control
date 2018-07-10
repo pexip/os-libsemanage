@@ -1,28 +1,32 @@
 Source: libsemanage
-VCS-Git: git://anonscm.debian.org/selinux/libsemanage.git
-VCS-Browser: http://anonscm.debian.org/gitweb/?p=selinux/libsemanage.git;a=summary
+VCS-Git: https://anonscm.debian.org/git/selinux/libsemanage.git
+VCS-Browser: https://anonscm.debian.org/gitweb/?p=selinux/libsemanage.git;a=summary
 Priority: optional
 Section: libdevel
 Maintainer: Pexip AS <packaging@pexip.com>
 XSBC-Pexip-Original-Maintainer: Debian SELinux maintainers <selinux-devel@lists.alioth.debian.org>
-XSBC-Pexip-Original-Uploaders: Manoj Srivastava <srivasta@debian.org>, Russell Coker <russell@coker.com.au>
-Standards-Version: 3.9.5
+XSBC-Pexip-Original-Uploaders: Manoj Srivastava <srivasta@debian.org>,
+           Russell Coker <russell@coker.com.au>
+Standards-Version: 3.9.8
 Build-Depends: bison,
                debhelper (>= 9),
+               dh-python,
                file,
                flex,
                gem2deb (>= 0.5.0~),
                libaudit-dev,
                libbz2-dev,
                libcunit1-dev,
-               libselinux1-dev (>= 2.3),
-               libsepol1-dev (>= 2.3),
+               libselinux1-dev (>= 2.6),
+               libsepol1-dev (>= 2.6),
                libustr-dev,
                pkg-config,
                python-all-dev (>= 2.6.6-3~),
+               python3-all-dev,
                swig
 Homepage: http://userspace.selinuxproject.org/
 X-Python-Version: >= 2.5
+X-Python3-Version: >= 3.2
 XS-Ruby-Versions: all
 XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
 
@@ -53,6 +57,9 @@ Section: libs
 Depends: libsemanage-common (= ${source:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
+Breaks: policycoreutils (<< 2.4),
+        selinux-policy-default (<< 2:2.20140421-10~),
+        selinux-policy-mls (<< 2:2.20140421-10~)
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
 Description: SELinux policy management library
@@ -77,9 +84,9 @@ Description: SELinux policy management library
 Package: libsemanage1-dev
 Architecture: linux-any
 Depends: libbz2-dev,
-         libselinux1-dev (>= 2.3),
+         libselinux1-dev (>= 2.6),
          libsemanage1 (= ${binary:Version}),
-         libsepol1-dev (>= 2.3),
+         libsepol1-dev (>= 2.6),
          libustr-dev,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -126,6 +133,48 @@ Section: python
 Description: Python bindings for SELinux policy management
  This package provides Python bindings for the management of SELinux
  policies.
+ .
+ Security-enhanced Linux is a patch of the Linux kernel and a
+ number of utilities with enhanced security functionality designed to
+ add mandatory access controls to Linux.  The Security-enhanced Linux
+ kernel contains new architectural components originally developed to
+ improve the security of the Flask operating system. These
+ architectural components provide general support for the enforcement
+ of many kinds of mandatory access control policies, including those
+ based on the concepts of Type Enforcement, Role-based Access
+ Control, and Multi-level Security.
+
+Package: python3-semanage
+Architecture: linux-any
+Depends: ${misc:Depends}, ${python3:Depends}, ${shlibs:Depends}
+Section: python
+Description: Python3 bindings for SELinux policy management
+ This package provides Python3 bindings for the management of SELinux
+ policies.
+ .
+ Security-enhanced Linux is a patch of the Linux kernel and a
+ number of utilities with enhanced security functionality designed to
+ add mandatory access controls to Linux.  The Security-enhanced Linux
+ kernel contains new architectural components originally developed to
+ improve the security of the Flask operating system. These
+ architectural components provide general support for the enforcement
+ of many kinds of mandatory access control policies, including those
+ based on the concepts of Type Enforcement, Role-based Access
+ Control, and Multi-level Security.
+
+Package: semanage-utils
+Architecture: linux-any
+Depends: libsepol1 (>= 2.6),
+         python,
+         python-selinux (>= 2.6),
+         python-semanage (>= 2.6),
+         ${misc:Depends},
+         ${python:Depends}
+Section: admin
+Description: SELinux policy management utilities
+ This package contains an utility that can be used to migrate from the old
+ policy store format (HLL, stored in /etc/selinux) to the new one (CLI, stored
+ in /var/lib/selinux).
  .
  Security-enhanced Linux is a patch of the Linux kernel and a
  number of utilities with enhanced security functionality designed to

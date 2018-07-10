@@ -4,9 +4,10 @@
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
 ifeq ($(DEB_STAGE),stage1)
-export DH_OPTIONS += -Nruby-semanage -Npython-semanage
+export DH_OPTIONS += -Nruby-semanage -Npython-semanage -Npython3-semanage
 else
 PYVERSIONS = $(shell pyversions -rv)
+PY3VERSIONS = $(shell py3versions -rv)
 RUBY_VERSIONS := $(shell dh_ruby --print-supported)
 endif
 
@@ -18,14 +19,18 @@ export DEB_CFLAGS_MAINT_APPEND = $(shell dpkg-buildflags --get CPPFLAGS)
 ifeq ($(DEB_STAGE),stage1)
 	dh $@
 else
-	dh $@ --with python2 --with ruby
+	dh $@ --with python2 --with ruby --with python3
 endif
 
 override_dh_auto_build:
-	$(MAKE) all LIBBASE="lib/${DEB_HOST_MULTIARCH}"
+	$(MAKE) all LIBBASE="lib/${DEB_HOST_MULTIARCH}" SELINUXEXECDIR="usr/lib/selinux"
 
 ifneq ($(DEB_STAGE),stage1)
 	for version in $(PYVERSIONS); do              \
+	  $(MAKE) pywrap PYTHON=python$$version  \
+	    PYPREFIX=python-$$version;  \
+	done;
+	for version in $(PY3VERSIONS); do              \
 	  $(MAKE) pywrap PYTHON=python$$version  \
 	    PYPREFIX=python-$$version;  \
 	done;
@@ -42,10 +47,16 @@ endif
 override_dh_auto_install:
 	$(MAKE) install DESTDIR="${CURDIR}/debian/tmp" \
 	  LIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}" \
-	  SHLIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}"
+	  SHLIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}" \
+	  SELINUXEXECDIR="${CURDIR}/debian/tmp/usr/lib/selinux"
 
 ifneq ($(DEB_STAGE),stage1)
 	for version in $(PYVERSIONS); do              \
+	  $(MAKE) install-pywrap PYTHON=python$$version  \
+	    DESTDIR="${CURDIR}/debian/tmp" \
+	    PYPREFIX=python-$$version;  \
+	done;
+	for version in $(PY3VERSIONS); do              \
 	  $(MAKE) install-pywrap PYTHON=python$$version  \
 	    DESTDIR="${CURDIR}/debian/tmp" \
 	    PYPREFIX=python-$$version;  \
@@ -72,6 +83,7 @@ override_dh_install:
 override_dh_fixperms:
 	dh_fixperms
 	-chmod -x ${CURDIR}/debian/python-semanage/usr/lib/python*/*-packages/semanage.py
+	-chmod -x ${CURDIR}/debian/python3-semanage/usr/lib/python*/*-packages/semanage.py
 
 override_dh_auto_test:
 	$(MAKE) test || true
