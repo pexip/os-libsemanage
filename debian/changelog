@@ -1,3 +1,69 @@
+libsemanage (2.8-2) unstable; urgency=medium
+
+  * d/p/0001-libsemanage-Always-set-errno-to-0-before-calling-get.patch:
+    Fix boggus error message when calling genhomedircon
+  * Bump Standards-Version to 4.3.0 (no further changes)
+
+ -- Laurent Bigonville <bigon@debian.org>  Sun, 06 Jan 2019 13:09:51 +0100
+
+libsemanage (2.8-1) unstable; urgency=medium
+
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+    - debian/libsemanage1.symbols: Add new exported symbol
+  * debian/control: Point Vcs-* fields to new (salsa) machine
+  * debian/rules: Adjust to match upstream changes to the build system
+  * debian/copyright: Fix a spelling error, thanks to lintian
+  * debian/control: Bump Standards-Version to 4.1.4 (no further changes)
+  * debian/rules: Use dh_missing --list-missing instead of dh_install
+  * debian/control: Remove X-Python(3)-Version fields as the required version
+    is already in oldstable, to please lintian
+
+ -- Laurent Bigonville <bigon@debian.org>  Tue, 29 May 2018 12:05:37 +0200
+
+libsemanage (2.7-2) unstable; urgency=medium
+
+  [ Laurent Bigonville ]
+  * debian/control: Drop libustr-dev (build-)dependency, not used anymore
+  * debian/rules: Make the tests failures fatal again, tests don't seems to
+    fail anymore
+
+  [ Helmut Grohne ]
+  * Support being built with multiple build profiles. (Closes: #875551)
+  * Support nocheck build profile. (Closes: #875558)
+  * Fix stage1 FTCBFS: Export triplet-prefixed CC. (Closes: #875559)
+  * Use profiles nopython and noruby rather than stage1. (Closes: #875562)
+
+ -- Laurent Bigonville <bigon@debian.org>  Fri, 15 Sep 2017 15:14:34 +0200
+
+libsemanage (2.7-1) unstable; urgency=medium
+
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+  * debian/control: Remove Manoj from the uploader list and add myself
+    instead. Thanks to him for all the work in the past.
+  * Bump debhelper compatibility to 10
+  * Bump Standards-Version to 4.1.0 (no further changes)
+  * Convert DEB_STAGE to DEB_BUILD_PROFILES
+
+ -- Laurent Bigonville <bigon@debian.org>  Sun, 10 Sep 2017 01:07:48 +0200
+
+libsemanage (2.7~rc2-1) experimental; urgency=medium
+
+  * Team upload.
+  * New upstream release candidate
+    - debian/control: Bump {build-}dependencies to match new release
+    - Drop debian/patches/fix_use-after-free_python3.patch, applied upstream
+    - Drop debian/patches/tests-makefile: Not needed anymore
+    - debian/libsemanage1.symbols: Update the exported symbols list
+  * Use python3 for semanage_migrate_store
+  * debian/watch: Add support for rc releases and use macros
+  * debian/control: Bump Standards-Version to 4.0.0 (no further changes)
+  * debian/rules: Fix the build of the ruby binding
+  * debian/rules: Fix the build of the python binding
+
+ -- Laurent Bigonville <bigon@debian.org>  Wed, 21 Jun 2017 21:56:16 +0200
+
 libsemanage (2.6-2) unstable; urgency=medium
 
   * Team upload.

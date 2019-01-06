@@ -1,14 +1,26 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 
-DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+include /usr/share/dpkg/architecture.mk
+ifeq ($(origin CC),default)
+CC := $(DEB_HOST_GNU_TYPE)-gcc
+endif
+export CC
 
-ifeq ($(DEB_STAGE),stage1)
-export DH_OPTIONS += -Nruby-semanage -Npython-semanage -Npython3-semanage
-else
+DOPACKAGES = $(shell dh_listpackages)
+
+DH_ADDONS=
+ifneq ($(filter python-semanage,$(DOPACKAGES)),)
 PYVERSIONS = $(shell pyversions -rv)
+DH_ADDONS += --with=python2
+endif
+ifneq ($(filter python3-semanage,$(DOPACKAGES)),)
 PY3VERSIONS = $(shell py3versions -rv)
+DH_ADDONS += --with=python3
+endif
+ifneq ($(filter ruby-semanage,$(DOPACKAGES)),)
 RUBY_VERSIONS := $(shell dh_ruby --print-supported)
+DH_ADDONS += --with=ruby
 endif
 
 # The build system doesn't use CPPFLAGS, pass them to CFLAGS to enable the
@@ -16,74 +28,64 @@ endif
 export DEB_CFLAGS_MAINT_APPEND = $(shell dpkg-buildflags --get CPPFLAGS)
 
 %:
-ifeq ($(DEB_STAGE),stage1)
-	dh $@
-else
-	dh $@ --with python2 --with ruby --with python3
-endif
+	dh $@ $(DH_ADDONS)
 
 override_dh_auto_build:
-	$(MAKE) all LIBBASE="lib/${DEB_HOST_MULTIARCH}" SELINUXEXECDIR="usr/lib/selinux"
+	$(MAKE) all
 
-ifneq ($(DEB_STAGE),stage1)
-	for version in $(PYVERSIONS); do              \
-	  $(MAKE) pywrap PYTHON=python$$version  \
-	    PYPREFIX=python-$$version;  \
+ifneq ($(filter python-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(PYVERSIONS); do         \
+	  $(MAKE) pywrap PYTHON=python$$version PYLIBS=; \
 	done;
-	for version in $(PY3VERSIONS); do              \
-	  $(MAKE) pywrap PYTHON=python$$version  \
-	    PYPREFIX=python-$$version;  \
+endif
+ifneq ($(filter python3-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(PY3VERSIONS); do        \
+	  $(MAKE) pywrap PYTHON=python$$version PYLIBS=; \
 	done;
-
-	for version in $(RUBY_VERSIONS); do              \
-	  RUBY_HDRDIR=$$($$version -e 'print RbConfig::CONFIG["rubyhdrdir"]'); \
-	  RUBY_ARCH_HDRDIR=$$($$version -e 'print RbConfig::CONFIG["rubyarchhdrdir"]'); \
-	  RUBY_VERSION=$$($$version -e 'print RbConfig::CONFIG["ruby_version"]'); \
-	  $(MAKE) -C src rubywrap RUBY=$$version RUBYLIBVER=$$RUBY_VERSION \
-	    RUBYINC="-I$$RUBY_HDRDIR -I$$RUBY_ARCH_HDRDIR"; \
+endif
+ifneq ($(filter ruby-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(RUBY_VERSIONS); do      \
+	  $(MAKE) -C src rubywrap RUBY=$$version; \
 	done;
 endif
 
 override_dh_auto_install:
 	$(MAKE) install DESTDIR="${CURDIR}/debian/tmp" \
-	  LIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}" \
-	  SHLIBDIR="${CURDIR}/debian/tmp/usr/lib/${DEB_HOST_MULTIARCH}" \
-	  SELINUXEXECDIR="${CURDIR}/debian/tmp/usr/lib/selinux"
+	  LIBDIR="/usr/lib/${DEB_HOST_MULTIARCH}" \
+	  SHLIBDIR="/usr/lib/${DEB_HOST_MULTIARCH}" \
+	  SELINUXEXECDIR="/usr/lib/selinux"
 
-ifneq ($(DEB_STAGE),stage1)
-	for version in $(PYVERSIONS); do              \
-	  $(MAKE) install-pywrap PYTHON=python$$version  \
-	    DESTDIR="${CURDIR}/debian/tmp" \
-	    PYPREFIX=python-$$version;  \
+ifneq ($(filter python-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(PYVERSIONS); do         \
+	  $(MAKE) install-pywrap PYTHON=python$$version DESTDIR="${CURDIR}/debian/tmp"; \
 	done;
-	for version in $(PY3VERSIONS); do              \
-	  $(MAKE) install-pywrap PYTHON=python$$version  \
-	    DESTDIR="${CURDIR}/debian/tmp" \
-	    PYPREFIX=python-$$version;  \
+endif
+ifneq ($(filter python3-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(PY3VERSIONS); do        \
+	  $(MAKE) install-pywrap PYTHON=python$$version DESTDIR="${CURDIR}/debian/tmp"; \
 	done;
-
-	for version in $(RUBY_VERSIONS); do              \
-	  RUBY_VENDOR_ARCHLIB=$$($$version -e 'print RbConfig::CONFIG["vendorarchdir"]'); \
-	  RUBY_VERSION=$$($$version -e 'print RbConfig::CONFIG["ruby_version"]'); \
-	  $(MAKE) -C src install-rubywrap RUBY=$$version RUBYLIBVER=$$RUBY_VERSION DESTDIR="${CURDIR}/debian/tmp" \
-	      RUBYINSTALL="${CURDIR}/debian/tmp/$$RUBY_VENDOR_ARCHLIB"; \
+endif
+ifneq ($(filter ruby-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(RUBY_VERSIONS); do      \
+	  $(MAKE) -C src install-rubywrap RUBY=$$version DESTDIR="${CURDIR}/debian/tmp"; \
 	done;
 endif
 
 override_dh_auto_clean:
-ifneq ($(DEB_STAGE),stage1)
-	for version in $(PYVERSIONS); do              \
+ifneq ($(filter python-semanage,$(DOPACKAGES)),)
+	set -e; for version in $(PYVERSIONS); do         \
 	  $(MAKE) clean PYTHON=python$$version;  \
 	done;
 endif
 
-override_dh_install:
-	dh_install --list-missing
+override_dh_missing:
+	dh_missing --list-missing
 
 override_dh_fixperms:
 	dh_fixperms
-	-chmod -x ${CURDIR}/debian/python-semanage/usr/lib/python*/*-packages/semanage.py
-	-chmod -x ${CURDIR}/debian/python3-semanage/usr/lib/python*/*-packages/semanage.py
-
-override_dh_auto_test:
-	$(MAKE) test || true
+ifneq ($(filter python-semanage,$(DOPACKAGES)),)
+	chmod -x ${CURDIR}/debian/python-semanage/usr/lib/python*/*-packages/semanage.py
+endif
+ifneq ($(filter python3-semanage,$(DOPACKAGES)),)
+	chmod -x ${CURDIR}/debian/python3-semanage/usr/lib/python*/*-packages/semanage.py
+endif
