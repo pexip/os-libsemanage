@@ -40,6 +40,8 @@
 #include "user_internal.h"
 #include "seuser_internal.h"
 #include "port_internal.h"
+#include "ibpkey_internal.h"
+#include "ibendport_internal.h"
 #include "iface_internal.h"
 #include "boolean_internal.h"
 #include "fcontext_internal.h"
@@ -58,6 +60,7 @@
 
 #define PIPE_READ 0
 #define PIPE_WRITE 1
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
 static void semanage_direct_destroy(semanage_handle_t * sh);
 static int semanage_direct_disconnect(semanage_handle_t * sh);
@@ -138,6 +141,7 @@ int semanage_direct_is_managed(semanage_handle_t * sh)
 int semanage_direct_connect(semanage_handle_t * sh)
 {
 	const char *path;
+	struct stat sb;
 
 	if (semanage_check_init(sh, sh->conf->store_root_path))
 		goto err;
@@ -145,9 +149,6 @@ int semanage_direct_connect(semanage_handle_t * sh)
 	if (sh->create_store)
 		if (semanage_create_store(sh, 1))
 			goto err;
-
-	if (semanage_access_check(sh) < SEMANAGE_CAN_READ)
-		goto err;
 
 	sh->u.direct.translock_file_fd = -1;
 	sh->u.direct.activelock_file_fd = -1;
@@ -208,6 +209,12 @@ int semanage_direct_connect(semanage_handle_t * sh)
 				     semanage_fcontext_dbase_local(sh)) < 0)
 		goto err;
 
+	if (fcontext_file_dbase_init(sh,
+				     semanage_path(SEMANAGE_ACTIVE, SEMANAGE_STORE_FC_HOMEDIRS),
+				     semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_HOMEDIRS),
+				     semanage_fcontext_dbase_homedirs(sh)) < 0)
+		goto err;
+
 	if (seuser_file_dbase_init(sh,
 				   semanage_path(SEMANAGE_ACTIVE,
 						 SEMANAGE_SEUSERS_LOCAL),
@@ -222,6 +229,22 @@ int semanage_direct_connect(semanage_handle_t * sh)
 				 semanage_path(SEMANAGE_TMP,
 					       SEMANAGE_NODES_LOCAL),
 				 semanage_node_dbase_local(sh)) < 0)
+		goto err;
+
+	if (ibpkey_file_dbase_init(sh,
+				   semanage_path(SEMANAGE_ACTIVE,
+					         SEMANAGE_IBPKEYS_LOCAL),
+				   semanage_path(SEMANAGE_TMP,
+					         SEMANAGE_IBPKEYS_LOCAL),
+				   semanage_ibpkey_dbase_local(sh)) < 0)
+		goto err;
+
+	if (ibendport_file_dbase_init(sh,
+				      semanage_path(SEMANAGE_ACTIVE,
+						    SEMANAGE_IBENDPORTS_LOCAL),
+				      semanage_path(SEMANAGE_TMP,
+						    SEMANAGE_IBENDPORTS_LOCAL),
+				      semanage_ibendport_dbase_local(sh)) < 0)
 		goto err;
 
 	/* Object databases: local modifications + policy */
@@ -246,6 +269,12 @@ int semanage_direct_connect(semanage_handle_t * sh)
 		goto err;
 
 	if (port_policydb_dbase_init(sh, semanage_port_dbase_policy(sh)) < 0)
+		goto err;
+
+	if (ibpkey_policydb_dbase_init(sh, semanage_ibpkey_dbase_policy(sh)) < 0)
+		goto err;
+
+	if (ibendport_policydb_dbase_init(sh, semanage_ibendport_dbase_policy(sh)) < 0)
 		goto err;
 
 	if (iface_policydb_dbase_init(sh, semanage_iface_dbase_policy(sh)) < 0)
@@ -275,10 +304,16 @@ int semanage_direct_connect(semanage_handle_t * sh)
 
 	/* set the disable dontaudit value */
 	path = semanage_path(SEMANAGE_ACTIVE, SEMANAGE_DISABLE_DONTAUDIT);
-	if (access(path, F_OK) == 0)
+
+	if (stat(path, &sb) == 0)
 		sepol_set_disable_dontaudit(sh->sepolh, 1);
-	else
+	else if (errno == ENOENT) {
+		/* The file does not exist */
 		sepol_set_disable_dontaudit(sh->sepolh, 0);
+	} else {
+		ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+		goto err;
+	}
 
 	return STATUS_SUCCESS;
 
@@ -293,25 +328,43 @@ static void semanage_direct_destroy(semanage_handle_t * sh
 	/* do nothing */
 }
 
-static int semanage_direct_disconnect(semanage_handle_t * sh)
+static int semanage_remove_tmps(semanage_handle_t *sh)
 {
-	/* destroy transaction */
-	if (sh->is_in_transaction) {
-		/* destroy sandbox */
-		if (semanage_remove_directory
-		    (semanage_path(SEMANAGE_TMP, SEMANAGE_TOPLEVEL)) < 0) {
+	if (sh->commit_err)
+		return 0;
+
+	/* destroy sandbox if it exists */
+	if (semanage_remove_directory
+	    (semanage_path(SEMANAGE_TMP, SEMANAGE_TOPLEVEL)) < 0) {
+		if (errno != ENOENT) {
 			ERR(sh, "Could not cleanly remove sandbox %s.",
 			    semanage_path(SEMANAGE_TMP, SEMANAGE_TOPLEVEL));
 			return -1;
 		}
-		if (semanage_remove_directory
-		    (semanage_final_path(SEMANAGE_FINAL_TMP,
-					 SEMANAGE_FINAL_TOPLEVEL)) < 0) {
+	}
+
+	/* destroy tmp policy if it exists */
+	if (semanage_remove_directory
+	    (semanage_final_path(SEMANAGE_FINAL_TMP,
+				 SEMANAGE_FINAL_TOPLEVEL)) < 0) {
+		if (errno != ENOENT) {
 			ERR(sh, "Could not cleanly remove tmp %s.",
 			    semanage_final_path(SEMANAGE_FINAL_TMP,
 						SEMANAGE_FINAL_TOPLEVEL));
 			return -1;
 		}
+	}
+
+	return 0;
+}
+
+static int semanage_direct_disconnect(semanage_handle_t *sh)
+{
+	int retval = 0;
+
+	/* destroy transaction and remove tmp files if no commit error */
+	if (sh->is_in_transaction) {
+		retval = semanage_remove_tmps(sh);
 		semanage_release_trans_lock(sh);
 	}
 
@@ -320,9 +373,12 @@ static int semanage_direct_disconnect(semanage_handle_t * sh)
 	user_extra_file_dbase_release(semanage_user_extra_dbase_local(sh));
 	user_join_dbase_release(semanage_user_dbase_local(sh));
 	port_file_dbase_release(semanage_port_dbase_local(sh));
+	ibpkey_file_dbase_release(semanage_ibpkey_dbase_local(sh));
+	ibendport_file_dbase_release(semanage_ibendport_dbase_local(sh));
 	iface_file_dbase_release(semanage_iface_dbase_local(sh));
 	bool_file_dbase_release(semanage_bool_dbase_local(sh));
 	fcontext_file_dbase_release(semanage_fcontext_dbase_local(sh));
+	fcontext_file_dbase_release(semanage_fcontext_dbase_homedirs(sh));
 	seuser_file_dbase_release(semanage_seuser_dbase_local(sh));
 	node_file_dbase_release(semanage_node_dbase_local(sh));
 
@@ -331,6 +387,8 @@ static int semanage_direct_disconnect(semanage_handle_t * sh)
 	user_extra_file_dbase_release(semanage_user_extra_dbase_policy(sh));
 	user_join_dbase_release(semanage_user_dbase_policy(sh));
 	port_policydb_dbase_release(semanage_port_dbase_policy(sh));
+	ibpkey_policydb_dbase_release(semanage_ibpkey_dbase_policy(sh));
+	ibendport_policydb_dbase_release(semanage_ibendport_dbase_policy(sh));
 	iface_policydb_dbase_release(semanage_iface_dbase_policy(sh));
 	bool_policydb_dbase_release(semanage_bool_dbase_policy(sh));
 	fcontext_file_dbase_release(semanage_fcontext_dbase_policy(sh));
@@ -340,15 +398,11 @@ static int semanage_direct_disconnect(semanage_handle_t * sh)
 	/* Release object databases: active kernel policy */
 	bool_activedb_dbase_release(semanage_bool_dbase_active(sh));
 
-	return 0;
+	return retval;
 }
 
 static int semanage_direct_begintrans(semanage_handle_t * sh)
 {
-
-	if (semanage_access_check(sh) != SEMANAGE_CAN_WRITE) {
-		return -1;
-	}
 	if (semanage_get_trans_lock(sh) < 0) {
 		return -1;
 	}
@@ -617,13 +671,33 @@ static int semanage_direct_update_user_extra(semanage_handle_t * sh, cil_db_t *c
 	}
 
 	if (size > 0) {
-		ofilename = semanage_path(SEMANAGE_TMP, SEMANAGE_USERS_EXTRA);
+		/*
+		 * Write the users_extra entries from CIL modules.
+		 * This file is used as our baseline when we do not require
+		 * re-linking.
+		 */
+		ofilename = semanage_path(SEMANAGE_TMP,
+					  SEMANAGE_USERS_EXTRA_LINKED);
 		if (ofilename == NULL) {
-			return retval;
+			retval = -1;
+			goto cleanup;
 		}
 		retval = write_file(sh, ofilename, data, size);
 		if (retval < 0)
-			return retval;
+			goto cleanup;
+
+		/*
+		 * Write the users_extra file; users_extra.local
+		 * will be merged into this file.
+		 */
+		ofilename = semanage_path(SEMANAGE_TMP, SEMANAGE_USERS_EXTRA);
+		if (ofilename == NULL) {
+			retval = -1;
+			goto cleanup;
+		}
+		retval = write_file(sh, ofilename, data, size);
+		if (retval < 0)
+			goto cleanup;
 
 		pusers_extra->dtable->drop_cache(pusers_extra->dbase);
 		
@@ -652,11 +726,33 @@ static int semanage_direct_update_seuser(semanage_handle_t * sh, cil_db_t *cildb
 	}
 
 	if (size > 0) {
-		ofilename = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS);
+		/*
+		 * Write the seusers entries from CIL modules.
+		 * This file is used as our baseline when we do not require
+		 * re-linking.
+		 */
+		ofilename = semanage_path(SEMANAGE_TMP,
+					  SEMANAGE_SEUSERS_LINKED);
 		if (ofilename == NULL) {
-			return -1;
+			retval = -1;
+			goto cleanup;
 		}
 		retval = write_file(sh, ofilename, data, size);
+		if (retval < 0)
+			goto cleanup;
+
+		/*
+		 * Write the seusers file; seusers.local will be merged into
+		 * this file.
+		 */
+		ofilename = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS);
+		if (ofilename == NULL) {
+			retval = -1;
+			goto cleanup;
+		}
+		retval = write_file(sh, ofilename, data, size);
+		if (retval < 0)
+			goto cleanup;
 
 		pseusers->dtable->drop_cache(pseusers->dbase);
 	} else {
@@ -705,9 +801,9 @@ static int read_from_pipe_to_data(semanage_handle_t *sh, size_t initial_len, int
 
 static int semanage_pipe_data(semanage_handle_t *sh, char *path, char *in_data, size_t in_data_len, char **out_data, size_t *out_data_len, char **err_data, size_t *err_data_len)
 {
-	int input_fd[2];
-	int output_fd[2];
-	int err_fd[2];
+	int input_fd[2] = {-1, -1};
+	int output_fd[2] = {-1, -1};
+	int err_fd[2] = {-1, -1};
 	pid_t pid;
 	char *data_read = NULL;
 	char *err_data_read = NULL;
@@ -895,7 +991,7 @@ cleanup:
 }
 
 static int semanage_direct_write_langext(semanage_handle_t *sh,
-				char *lang_ext,
+				const char *lang_ext,
 				const semanage_module_info_t *modinfo)
 {
 	int ret = -1;
@@ -955,8 +1051,8 @@ static int semanage_compile_module(semanage_handle_t *sh,
 	ssize_t bzip_status;
 	int status = 0;
 	int compressed;
-	size_t cil_data_len;
-	size_t err_data_len;
+	size_t cil_data_len = 0;
+	size_t err_data_len = 0;
 
 	if (!strcasecmp(modinfo->lang_ext, "cil")) {
 		goto cleanup;
@@ -1051,6 +1147,7 @@ static int semanage_compile_hll_modules(semanage_handle_t *sh,
 	int status = 0;
 	int i;
 	char cil_path[PATH_MAX];
+	struct stat sb;
 
 	assert(sh);
 	assert(modinfos);
@@ -1067,8 +1164,12 @@ static int semanage_compile_hll_modules(semanage_handle_t *sh,
 		}
 
 		if (semanage_get_ignore_module_cache(sh) == 0 &&
-				access(cil_path, F_OK) == 0) {
+				(status = stat(cil_path, &sb)) == 0) {
 			continue;
+		}
+		if (status != 0 && errno != ENOENT) {
+			ERR(sh, "Unable to access %s: %s\n", cil_path, strerror(errno));
+			goto cleanup; //an error in the "stat" call
 		}
 
 		status = semanage_compile_module(sh, &modinfos[i]);
@@ -1083,6 +1184,14 @@ cleanup:
 	return status;
 }
 
+/* Copies a file from src to dst. If dst already exists then
+ * overwrite it. If source doesn't exist then return success.
+ * Returns 0 on success, -1 on error. */
+static int copy_file_if_exists(const char *src, const char *dst, mode_t mode){
+	int rc = semanage_copy_file(src, dst, mode);
+	return (rc < 0 && errno != ENOENT) ? rc : 0;
+}
+
 /********************* direct API functions ********************/
 
 /* Commits all changes in sandbox to the actual kernel policy.
@@ -1095,23 +1204,27 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	size_t fc_buffer_len = 0;
 	const char *ofilename = NULL;
 	const char *path;
-	int retval = -1, num_modinfos = 0, i, missing_policy_kern = 0,
-		missing_seusers = 0, missing_fc = 0, missing = 0;
+	int retval = -1, num_modinfos = 0, i;
 	sepol_policydb_t *out = NULL;
 	struct cil_db *cildb = NULL;
 	semanage_module_info_t *modinfos = NULL;
+	mode_t mask = umask(0077);
+	struct stat sb;
 
-	/* Declare some variables */
-	int modified = 0, fcontexts_modified, ports_modified,
-	    seusers_modified, users_extra_modified, dontaudit_modified,
-	    preserve_tunables_modified, bools_modified = 0,
-		disable_dontaudit, preserve_tunables;
+	int do_rebuild, do_write_kernel, do_install;
+	int fcontexts_modified, ports_modified, seusers_modified,
+		disable_dontaudit, preserve_tunables, ibpkeys_modified,
+		ibendports_modified;
 	dbase_config_t *users = semanage_user_dbase_local(sh);
 	dbase_config_t *users_base = semanage_user_base_dbase_local(sh);
 	dbase_config_t *pusers_base = semanage_user_base_dbase_policy(sh);
-	dbase_config_t *users_extra = semanage_user_extra_dbase_local(sh);
+	dbase_config_t *pusers_extra = semanage_user_extra_dbase_policy(sh);
 	dbase_config_t *ports = semanage_port_dbase_local(sh);
 	dbase_config_t *pports = semanage_port_dbase_policy(sh);
+	dbase_config_t *ibpkeys = semanage_ibpkey_dbase_local(sh);
+	dbase_config_t *pibpkeys = semanage_ibpkey_dbase_policy(sh);
+	dbase_config_t *ibendports = semanage_ibendport_dbase_local(sh);
+	dbase_config_t *pibendports = semanage_ibendport_dbase_policy(sh);
 	dbase_config_t *bools = semanage_bool_dbase_local(sh);
 	dbase_config_t *pbools = semanage_bool_dbase_policy(sh);
 	dbase_config_t *ifaces = semanage_iface_dbase_local(sh);
@@ -1121,13 +1234,30 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	dbase_config_t *fcontexts = semanage_fcontext_dbase_local(sh);
 	dbase_config_t *pfcontexts = semanage_fcontext_dbase_policy(sh);
 	dbase_config_t *seusers = semanage_seuser_dbase_local(sh);
+	dbase_config_t *pseusers = semanage_seuser_dbase_policy(sh);
+
+	/* Modified flags that we need to use more than once. */
+	ports_modified = ports->dtable->is_modified(ports->dbase);
+	ibpkeys_modified = ibpkeys->dtable->is_modified(ibpkeys->dbase);
+	ibendports_modified = ibendports->dtable->is_modified(ibendports->dbase);
+	seusers_modified = seusers->dtable->is_modified(seusers->dbase);
+	fcontexts_modified = fcontexts->dtable->is_modified(fcontexts->dbase);
+
+	/* Rebuild if explicitly requested or any module changes occurred. */
+	do_rebuild = sh->do_rebuild | sh->modules_modified;
 
 	/* Create or remove the disable_dontaudit flag file. */
 	path = semanage_path(SEMANAGE_TMP, SEMANAGE_DISABLE_DONTAUDIT);
-	if (access(path, F_OK) == 0)
-		dontaudit_modified = !(sepol_get_disable_dontaudit(sh->sepolh) == 1);
-	else
-		dontaudit_modified = (sepol_get_disable_dontaudit(sh->sepolh) == 1);
+	if (stat(path, &sb) == 0)
+		do_rebuild |= !(sepol_get_disable_dontaudit(sh->sepolh) == 1);
+	else if (errno == ENOENT) {
+		/* The file does not exist */
+		do_rebuild |= (sepol_get_disable_dontaudit(sh->sepolh) == 1);
+	} else {
+		ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+		retval = -1;
+		goto cleanup;
+	}
 	if (sepol_get_disable_dontaudit(sh->sepolh) == 1) {
 		FILE *touch;
 		touch = fopen(path, "w");
@@ -1149,10 +1279,17 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 
 	/* Create or remove the preserve_tunables flag file. */
 	path = semanage_path(SEMANAGE_TMP, SEMANAGE_PRESERVE_TUNABLES);
-	if (access(path, F_OK) == 0)
-		preserve_tunables_modified = !(sepol_get_preserve_tunables(sh->sepolh) == 1);
-	else
-		preserve_tunables_modified = (sepol_get_preserve_tunables(sh->sepolh) == 1);
+	if (stat(path, &sb) == 0)
+		do_rebuild |= !(sepol_get_preserve_tunables(sh->sepolh) == 1);
+	else if (errno == ENOENT) {
+		/* The file does not exist */
+		do_rebuild |= (sepol_get_preserve_tunables(sh->sepolh) == 1);
+	} else {
+		ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+		retval = -1;
+		goto cleanup;
+	}
+
 	if (sepol_get_preserve_tunables(sh->sepolh) == 1) {
 		FILE *touch;
 		touch = fopen(path, "w");
@@ -1180,54 +1317,61 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 			goto cleanup;
 	}
 
-	/* Decide if anything was modified */
-	fcontexts_modified = fcontexts->dtable->is_modified(fcontexts->dbase);
-	seusers_modified = seusers->dtable->is_modified(seusers->dbase);
-	users_extra_modified =
-	    users_extra->dtable->is_modified(users_extra->dbase);
-	ports_modified = ports->dtable->is_modified(ports->dbase);
-	bools_modified = bools->dtable->is_modified(bools->dbase);
-
-	modified = sh->modules_modified;
-	modified |= seusers_modified;
-	modified |= users_extra_modified;
-	modified |= ports_modified;
-	modified |= users->dtable->is_modified(users_base->dbase);
-	modified |= ifaces->dtable->is_modified(ifaces->dbase);
-	modified |= nodes->dtable->is_modified(nodes->dbase);
-	modified |= dontaudit_modified;
-	modified |= preserve_tunables_modified;
-
-	/* This is for systems that have already migrated with an older version
-	 * of semanage_migrate_store. The older version did not copy policy.kern so
-	 * the policy binary must be rebuilt here.
+	/*
+	 * This is for systems that have already migrated with an older version
+	 * of semanage_migrate_store. The older version did not copy
+	 * policy.kern so the policy binary must be rebuilt here.
+	 * This also ensures that any linked files that are required
+	 * in order to skip re-linking are present; otherwise, we force
+	 * a rebuild.
 	 */
-	if (!sh->do_rebuild && !modified) {
-		path = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_KERNEL);
+	if (!do_rebuild) {
+		int files[] = {SEMANAGE_STORE_KERNEL,
+					   SEMANAGE_STORE_FC,
+					   SEMANAGE_STORE_SEUSERS,
+					   SEMANAGE_LINKED,
+					   SEMANAGE_SEUSERS_LINKED,
+					   SEMANAGE_USERS_EXTRA_LINKED};
 
-		if (access(path, F_OK) != 0) {
-			missing_policy_kern = 1;
-		}
+		for (i = 0; i < (int) ARRAY_SIZE(files); i++) {
+			path = semanage_path(SEMANAGE_TMP, files[i]);
+			if (stat(path, &sb) != 0) {
+				if (errno != ENOENT) {
+					ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+					retval = -1;
+					goto cleanup;
+				}
 
-		path = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC);
-
-		if (access(path, F_OK) != 0) {
-			missing_fc = 1;
-		}
-
-		path = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS);
-
-		if (access(path, F_OK) != 0) {
-			missing_seusers = 1;
+				do_rebuild = 1;
+				goto rebuild;
+			}
 		}
 	}
 
-	missing |= missing_policy_kern;
-	missing |= missing_fc;
-	missing |= missing_seusers;
+rebuild:
+	/*
+	 * Now that we know whether or not a rebuild is required,
+	 * we can determine what else needs to be done.
+	 * We need to write the kernel policy if we are rebuilding
+	 * or if any other policy component that lives in the kernel
+	 * policy has been modified.
+	 * We need to install the policy files if any of the managed files
+	 * that live under /etc/selinux (kernel policy, seusers, file contexts)
+	 * will be modified.
+	 */
+	do_write_kernel = do_rebuild | ports_modified | ibpkeys_modified |
+		ibendports_modified |
+		bools->dtable->is_modified(bools->dbase) |
+		ifaces->dtable->is_modified(ifaces->dbase) |
+		nodes->dtable->is_modified(nodes->dbase) |
+		users->dtable->is_modified(users_base->dbase);
+	do_install = do_write_kernel | seusers_modified | fcontexts_modified;
 
-	/* If there were policy changes, or explicitly requested, rebuild the policy */
-	if (sh->do_rebuild || modified || missing) {
+	/*
+	 * If there were policy changes, or explicitly requested, or
+	 * any required files are missing, rebuild the policy.
+	 */
+	if (do_rebuild) {
 		/* =================== Module expansion =============== */
 
 		retval = semanage_get_active_modules(sh, &modinfos, &num_modinfos);
@@ -1316,41 +1460,82 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 			goto cleanup;
 
 		cil_db_destroy(&cildb);
-	
+
+		/* Write the linked policy before merging local changes. */
+		retval = semanage_write_policydb(sh, out,
+						 SEMANAGE_LINKED);
+		if (retval < 0)
+			goto cleanup;
 	} else {
-		/* Load already linked policy */
+		/* Load the existing linked policy, w/o local changes */
 		retval = sepol_policydb_create(&out);
 		if (retval < 0)
 			goto cleanup;
 
-		retval = semanage_read_policydb(sh, out);
+		retval = semanage_read_policydb(sh, out, SEMANAGE_LINKED);
 		if (retval < 0)
 			goto cleanup;
+
+		path = semanage_path(SEMANAGE_TMP, SEMANAGE_SEUSERS_LINKED);
+		if (stat(path, &sb) == 0) {
+			retval = semanage_copy_file(path,
+						    semanage_path(SEMANAGE_TMP,
+								  SEMANAGE_STORE_SEUSERS),
+						    0);
+			if (retval < 0)
+				goto cleanup;
+			pseusers->dtable->drop_cache(pseusers->dbase);
+		} else if (errno == ENOENT) {
+			/* The file does not exist */
+			pseusers->dtable->clear(sh, pseusers->dbase);
+		} else {
+			ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+			retval = -1;
+			goto cleanup;
+		}
+
+		path = semanage_path(SEMANAGE_TMP, SEMANAGE_USERS_EXTRA_LINKED);
+		if (stat(path, &sb) == 0) {
+			retval = semanage_copy_file(path,
+						    semanage_path(SEMANAGE_TMP,
+								  SEMANAGE_USERS_EXTRA),
+						    0);
+			if (retval < 0)
+				goto cleanup;
+			pusers_extra->dtable->drop_cache(pusers_extra->dbase);
+		} else if (errno == ENOENT) {
+			/* The file does not exist */
+			pusers_extra->dtable->clear(sh, pusers_extra->dbase);
+		} else {
+			ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+			retval = -1;
+			goto cleanup;
+		}
 	}
 
-	if (sh->do_rebuild || modified || bools_modified) {
-		/* Attach to policy databases that work with a policydb. */
-		dbase_policydb_attach((dbase_policydb_t *) pusers_base->dbase, out);
-		dbase_policydb_attach((dbase_policydb_t *) pports->dbase, out);
-		dbase_policydb_attach((dbase_policydb_t *) pifaces->dbase, out);
-		dbase_policydb_attach((dbase_policydb_t *) pbools->dbase, out);
-		dbase_policydb_attach((dbase_policydb_t *) pnodes->dbase, out);
+	/* Attach our databases to the policydb we just created or loaded. */
+	dbase_policydb_attach((dbase_policydb_t *) pusers_base->dbase, out);
+	dbase_policydb_attach((dbase_policydb_t *) pports->dbase, out);
+	dbase_policydb_attach((dbase_policydb_t *) pibpkeys->dbase, out);
+	dbase_policydb_attach((dbase_policydb_t *) pibendports->dbase, out);
+	dbase_policydb_attach((dbase_policydb_t *) pifaces->dbase, out);
+	dbase_policydb_attach((dbase_policydb_t *) pbools->dbase, out);
+	dbase_policydb_attach((dbase_policydb_t *) pnodes->dbase, out);
 
-		/* ============= Apply changes, and verify  =============== */
+	/* Merge local changes */
+	retval = semanage_base_merge_components(sh);
+	if (retval < 0)
+		goto cleanup;
 
-		retval = semanage_base_merge_components(sh);
+	if (do_write_kernel) {
+		/* Write new kernel policy. */
+		retval = semanage_write_policydb(sh, out,
+						 SEMANAGE_STORE_KERNEL);
 		if (retval < 0)
 			goto cleanup;
 
-		retval = semanage_write_policydb(sh, out);
-		if (retval < 0)
-			goto cleanup;
-
+		/* Run the kernel policy verifier, if any. */
 		retval = semanage_verify_kernel(sh);
-		if (retval < 0)
-			goto cleanup;
-	} else {
-		retval = semanage_base_merge_components(sh);
 		if (retval < 0)
 			goto cleanup;
 	}
@@ -1361,26 +1546,39 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	 * Note: those are still cached, even though they've been 
 	 * merged into the main file_contexts. We won't check the 
 	 * large file_contexts - checked at compile time */
-	if (sh->do_rebuild || modified || fcontexts_modified) {
+	if (do_rebuild || fcontexts_modified) {
 		retval = semanage_fcontext_validate_local(sh, out);
 		if (retval < 0)
 			goto cleanup;
 	}
 
 	/* Validate local seusers against policy */
-	if (sh->do_rebuild || modified || seusers_modified) {
+	if (do_rebuild || seusers_modified) {
 		retval = semanage_seuser_validate_local(sh, out);
 		if (retval < 0)
 			goto cleanup;
 	}
 
 	/* Validate local ports for overlap */
-	if (sh->do_rebuild || modified || ports_modified) {
+	if (do_rebuild || ports_modified) {
 		retval = semanage_port_validate_local(sh);
 		if (retval < 0)
 			goto cleanup;
 	}
 
+	/* Validate local ibpkeys for overlap */
+	if (do_rebuild || ibpkeys_modified) {
+		retval = semanage_ibpkey_validate_local(sh);
+		if (retval < 0)
+			goto cleanup;
+	}
+
+	/* Validate local ibendports */
+	if (do_rebuild || ibendports_modified) {
+		retval = semanage_ibendport_validate_local(sh);
+		if (retval < 0)
+			goto cleanup;
+	}
 	/* ================== Write non-policydb components ========= */
 
 	/* Commit changes to components */
@@ -1395,44 +1593,44 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 		goto cleanup;
 	}
 
-	path = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_LOCAL);
-	if (access(path, F_OK) == 0) {
-		retval = semanage_copy_file(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_LOCAL),
-							semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_FC_LOCAL),
-							sh->conf->file_mode);
-		if (retval < 0) {
-			goto cleanup;
-		}
+	retval = copy_file_if_exists(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_LOCAL),
+						semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_FC_LOCAL),
+						sh->conf->file_mode);
+	if (retval < 0) {
+		goto cleanup;
 	}
 
-	path = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC);
-	if (access(path, F_OK) == 0) {
-		retval = semanage_copy_file(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC),
-							semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_FC),
-							sh->conf->file_mode);
-		if (retval < 0) {
-			goto cleanup;
-		}
+	retval = copy_file_if_exists(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC),
+						semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_FC),
+						sh->conf->file_mode);
+	if (retval < 0) {
+		goto cleanup;
 	}
 
-	path = semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS);
-	if (access(path, F_OK) == 0) {
-		retval = semanage_copy_file(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS),
-							semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_SEUSERS),
-							sh->conf->file_mode);
-		if (retval < 0) {
-			goto cleanup;
-		}
+	retval = copy_file_if_exists(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS),
+						semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_SEUSERS),
+						sh->conf->file_mode);
+	if (retval < 0) {
+		goto cleanup;
 	}
 
 	/* run genhomedircon if its enabled, this should be the last operation
 	 * which requires the out policydb */
 	if (!sh->conf->disable_genhomedircon) {
-		if (out && (retval =
-			semanage_genhomedircon(sh, out, sh->conf->usepasswd, sh->conf->ignoredirs)) != 0) {
-			ERR(sh, "semanage_genhomedircon returned error code %d.",
-			    retval);
-			goto cleanup;
+		if (out){
+			if ((retval = semanage_genhomedircon(sh, out, sh->conf->usepasswd,
+								sh->conf->ignoredirs)) != 0) {
+				ERR(sh, "semanage_genhomedircon returned error code %d.", retval);
+				goto cleanup;
+			}
+			/* file_contexts.homedirs was created in SEMANAGE_TMP store */
+			retval = semanage_copy_file(
+						semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_HOMEDIRS),
+						semanage_final_path(SEMANAGE_FINAL_TMP,	SEMANAGE_FC_HOMEDIRS),
+						sh->conf->file_mode);
+			if (retval < 0) {
+				goto cleanup;
+			}
 		}
 	} else {
 		WARN(sh, "WARNING: genhomedircon is disabled. \
@@ -1444,9 +1642,8 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	sepol_policydb_free(out);
 	out = NULL;
 
-	if (sh->do_rebuild || modified || bools_modified || fcontexts_modified) {
+	if (do_install)
 		retval = semanage_install_sandbox(sh);
-	}
 
 cleanup:
 	for (i = 0; i < num_modinfos; i++) {
@@ -1458,29 +1655,33 @@ cleanup:
 		free(mod_filenames[i]);
 	}
 
-	if (modified || bools_modified) {
-		/* Detach from policydb, so it can be freed */
-		dbase_policydb_detach((dbase_policydb_t *) pusers_base->dbase);
-		dbase_policydb_detach((dbase_policydb_t *) pports->dbase);
-		dbase_policydb_detach((dbase_policydb_t *) pifaces->dbase);
-		dbase_policydb_detach((dbase_policydb_t *) pnodes->dbase);
-		dbase_policydb_detach((dbase_policydb_t *) pbools->dbase);
-	}
+	/* Detach from policydb, so it can be freed */
+	dbase_policydb_detach((dbase_policydb_t *) pusers_base->dbase);
+	dbase_policydb_detach((dbase_policydb_t *) pports->dbase);
+	dbase_policydb_detach((dbase_policydb_t *) pibpkeys->dbase);
+	dbase_policydb_detach((dbase_policydb_t *) pibendports->dbase);
+	dbase_policydb_detach((dbase_policydb_t *) pifaces->dbase);
+	dbase_policydb_detach((dbase_policydb_t *) pnodes->dbase);
+	dbase_policydb_detach((dbase_policydb_t *) pbools->dbase);
 
 	free(mod_filenames);
 	sepol_policydb_free(out);
 	cil_db_destroy(&cildb);
-	semanage_release_trans_lock(sh);
 
 	free(fc_buffer);
 
-	/* regardless if the commit was successful or not, remove the
-	   sandbox if it is still there */
-	semanage_remove_directory(semanage_path
-				  (SEMANAGE_TMP, SEMANAGE_TOPLEVEL));
-	semanage_remove_directory(semanage_final_path
-				  (SEMANAGE_FINAL_TMP,
-				   SEMANAGE_FINAL_TOPLEVEL));
+	/* Set commit_err so other functions can detect any errors. Note that
+	 * retval > 0 will be the commit number.
+	 */
+	if (retval < 0)
+		sh->commit_err = retval;
+
+	if (semanage_remove_tmps(sh) != 0)
+		retval = -1;
+
+	semanage_release_trans_lock(sh);
+	umask(mask);
+
 	return retval;
 }
 
@@ -1638,6 +1839,7 @@ static int semanage_direct_extract(semanage_handle_t * sh,
 	ssize_t _data_len;
 	char *_data;
 	int compressed;
+	struct stat sb;
 
 	/* get path of module */
 	rc = semanage_module_get_path(
@@ -1650,8 +1852,8 @@ static int semanage_direct_extract(semanage_handle_t * sh,
 		goto cleanup;
 	}
 
-	if (access(module_path, F_OK) != 0) {
-		ERR(sh, "Module does not exist: %s", module_path);
+	if (stat(module_path, &sb) != 0) {
+		ERR(sh, "Unable to access %s: %s\n", module_path, strerror(errno));
 		rc = -1;
 		goto cleanup;
 	}
@@ -1680,7 +1882,13 @@ static int semanage_direct_extract(semanage_handle_t * sh,
 		goto cleanup;
 	}
 
-	if (extract_cil == 1 && strcmp(_modinfo->lang_ext, "cil") && access(input_file, F_OK) != 0) {
+	if (extract_cil == 1 && strcmp(_modinfo->lang_ext, "cil") && stat(input_file, &sb) != 0) {
+		if (errno != ENOENT) {
+			ERR(sh, "Unable to access %s: %s\n", input_file, strerror(errno));
+			rc = -1;
+			goto cleanup;
+		}
+
 		rc = semanage_compile_module(sh, _modinfo);
 		if (rc < 0) {
 			goto cleanup;
@@ -1825,6 +2033,12 @@ static int semanage_direct_get_enabled(semanage_handle_t *sh,
 	}
 
 	if (stat(path, &sb) < 0) {
+		if (errno != ENOENT) {
+			ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+			status = -1;
+			goto cleanup;
+		}
+
 		*enabled = 1;
 	}
 	else {
@@ -1852,6 +2066,7 @@ static int semanage_direct_set_enabled(semanage_handle_t *sh,
 	const char *path = NULL;
 	FILE *fp = NULL;
 	semanage_module_info_t *modinfo = NULL;
+	mode_t mask;
 
 	/* check transaction */
 	if (!sh->is_in_transaction) {
@@ -1912,7 +2127,9 @@ static int semanage_direct_set_enabled(semanage_handle_t *sh,
 
 	switch (enabled) {
 		case 0: /* disable the module */
+			mask = umask(0077);
 			fp = fopen(fn, "w");
+			umask(mask);
 
 			if (fp == NULL) {
 				ERR(sh,
@@ -1981,7 +2198,7 @@ int semanage_direct_mls_enabled(semanage_handle_t * sh)
 	if (retval < 0)
 		goto cleanup;
 
-	retval = semanage_read_policydb(sh, p);
+	retval = semanage_read_policydb(sh, p, SEMANAGE_STORE_KERNEL);
 	if (retval < 0)
 		goto cleanup;
 
@@ -2148,6 +2365,12 @@ static int semanage_direct_get_module_info(semanage_handle_t *sh,
 
 	/* set enabled/disabled status */
 	if (stat(fn, &sb) < 0) {
+		if (errno != ENOENT) {
+			ERR(sh, "Unable to access %s: %s\n", fn, strerror(errno));
+			status = -1;
+			goto cleanup;
+		}
+
 		ret = semanage_module_info_set_enabled(sh, *modinfo, 1);
 		if (ret != 0) {
 			status = -1;
@@ -2499,11 +2722,7 @@ static int semanage_direct_list_all(semanage_handle_t *sh,
 				goto cleanup;
 			}
 
-			ret = semanage_module_info_destroy(sh, modinfo_tmp);
-			if (ret != 0) {
-				status = -1;
-				goto cleanup;
-			}
+			semanage_module_info_destroy(sh, modinfo_tmp);
 			free(modinfo_tmp);
 			modinfo_tmp = NULL;
 
@@ -2528,11 +2747,7 @@ cleanup:
 		free(modules);
 	}
 
-	ret = semanage_module_info_destroy(sh, modinfo_tmp);
-	if (ret != 0) {
-		status = -1;
-		goto cleanup;
-	}
+	semanage_module_info_destroy(sh, modinfo_tmp);
 	free(modinfo_tmp);
 	modinfo_tmp = NULL;
 
@@ -2564,8 +2779,10 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 	int status = 0;
 	int ret = 0;
 	int type;
+	struct stat sb;
 
 	char path[PATH_MAX];
+	mode_t mask = umask(0077);
 
 	semanage_module_info_t *higher_info = NULL;
 	semanage_module_key_t higher_key;
@@ -2614,7 +2831,7 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 		if (higher_info->enabled == 0 && modinfo->enabled == -1) {
 			errno = 0;
 			WARN(sh,
-			     "%s module will be disabled after install due to default enabled status.",
+			     "%s module will be disabled after install as there is a disabled instance of this module present in the system.",
 			     modinfo->name);
 		}
 	}
@@ -2663,7 +2880,7 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 			goto cleanup;
 		}
 
-		if (access(path, F_OK) == 0) {
+		if (stat(path, &sb) == 0) {
 			ret = unlink(path);
 			if (ret != 0) {
 				ERR(sh, "Error while removing cached CIL file %s: %s", path, strerror(errno));
@@ -2677,6 +2894,7 @@ cleanup:
 	semanage_module_key_destroy(sh, &higher_key);
 	semanage_module_info_destroy(sh, higher_info);
 	free(higher_info);
+	umask(mask);
 
 	return status;
 }
