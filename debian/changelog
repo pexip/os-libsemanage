@@ -1,3 +1,9 @@
+libsemanage (2.8-2pexip1) pexip; urgency=medium
+
+  * Migrate to Buster
+
+ -- Vincent Sanders <vince@pexip.com>  Sat, 29 Feb 2020 15:47:17 +0000
+
 libsemanage (2.8-2) unstable; urgency=medium
 
   * d/p/0001-libsemanage-Always-set-errno-to-0-before-calling-get.patch:
