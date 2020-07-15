@@ -541,14 +541,18 @@ int semanage_create_store(semanage_handle_t * sh, int create)
 	struct stat sb;
 	const char *path = semanage_files[SEMANAGE_ROOT];
 	int fd;
+	mode_t mask;
 
 	if (stat(path, &sb) == -1) {
 		if (errno == ENOENT && create) {
+			mask = umask(0077);
 			if (mkdir(path, S_IRWXU) == -1) {
+				umask(mask);
 				ERR(sh, "Could not create module store at %s.",
 				    path);
 				return -2;
 			}
+			umask(mask);
 		} else {
 			if (create)
 				ERR(sh,
@@ -567,12 +571,15 @@ int semanage_create_store(semanage_handle_t * sh, int create)
 	path = semanage_path(SEMANAGE_ACTIVE, SEMANAGE_TOPLEVEL);
 	if (stat(path, &sb) == -1) {
 		if (errno == ENOENT && create) {
+			mask = umask(0077);
 			if (mkdir(path, S_IRWXU) == -1) {
+				umask(mask);
 				ERR(sh,
 				    "Could not create module store, active subdirectory at %s.",
 				    path);
 				return -2;
 			}
+			umask(mask);
 		} else {
 			ERR(sh,
 			    "Could not read from module store, active subdirectory at %s.",
@@ -590,12 +597,15 @@ int semanage_create_store(semanage_handle_t * sh, int create)
 	path = semanage_path(SEMANAGE_ACTIVE, SEMANAGE_MODULES);
 	if (stat(path, &sb) == -1) {
 		if (errno == ENOENT && create) {
+			mask = umask(0077);
 			if (mkdir(path, S_IRWXU) == -1) {
+				umask(mask);
 				ERR(sh,
 				    "Could not create module store, active modules subdirectory at %s.",
 				    path);
 				return -2;
 			}
+			umask(mask);
 		} else {
 			ERR(sh,
 			    "Could not read from module store, active modules subdirectory at %s.",
@@ -613,11 +623,14 @@ int semanage_create_store(semanage_handle_t * sh, int create)
 	path = semanage_files[SEMANAGE_READ_LOCK];
 	if (stat(path, &sb) == -1) {
 		if (errno == ENOENT && create) {
+			mask = umask(0077);
 			if ((fd = creat(path, S_IRUSR | S_IWUSR)) == -1) {
+				umask(mask);
 				ERR(sh, "Could not create lock file at %s.",
 				    path);
 				return -2;
 			}
+			umask(mask);
 			close(fd);
 		} else {
 			ERR(sh, "Could not read lock file at %s.", path);
@@ -694,7 +707,8 @@ static int semanage_filename_select(const struct dirent *d)
 
 /* Copies a file from src to dst.  If dst already exists then
  * overwrite it.  Returns 0 on success, -1 on error. */
-int semanage_copy_file(const char *src, const char *dst, mode_t mode)
+int semanage_copy_file(const char *src, const char *dst, mode_t mode,
+		bool syncrequired)
 {
 	int in, out, retval = 0, amount_read, n, errsv = errno;
 	char tmp[PATH_MAX];
@@ -722,8 +736,11 @@ int semanage_copy_file(const char *src, const char *dst, mode_t mode)
 	}
 	umask(mask);
 	while (retval == 0 && (amount_read = read(in, buf, sizeof(buf))) > 0) {
-		if (write(out, buf, amount_read) < 0) {
-			errsv = errno;
+		if (write(out, buf, amount_read) != amount_read) {
+			if (errno)
+				errsv = errno;
+			else
+				errsv = EIO;
 			retval = -1;
 		}
 	}
@@ -732,6 +749,10 @@ int semanage_copy_file(const char *src, const char *dst, mode_t mode)
 		retval = -1;
 	}
 	close(in);
+	if (syncrequired && fsync(out) < 0) {
+		errsv = errno;
+		retval = -1;
+	}
 	if (close(out) < 0) {
 		errsv = errno;
 		retval = -1;
@@ -763,6 +784,7 @@ static int semanage_copy_dir_flags(const char *src, const char *dst, int flag)
 	struct stat sb;
 	struct dirent **names = NULL;
 	char path[PATH_MAX], path2[PATH_MAX];
+	mode_t mask;
 
 	if ((len = scandir(src, &names, semanage_filename_select, NULL)) == -1) {
 		fprintf(stderr, "Could not read the contents of %s: %s\n", src, strerror(errno));
@@ -770,10 +792,13 @@ static int semanage_copy_dir_flags(const char *src, const char *dst, int flag)
 	}
 
 	if (stat(dst, &sb) != 0) {
+		mask = umask(0077);
 		if (mkdir(dst, S_IRWXU) != 0) {
+			umask(mask);
 			fprintf(stderr, "Could not create %s: %s\n", dst, strerror(errno));
 			goto cleanup;
 		}
+		umask(mask);
 	}
 
 	for (i = 0; i < len; i++) {
@@ -785,14 +810,21 @@ static int semanage_copy_dir_flags(const char *src, const char *dst, int flag)
 		}
 		snprintf(path2, sizeof(path2), "%s/%s", dst, names[i]->d_name);
 		if (S_ISDIR(sb.st_mode)) {
+			mask = umask(0077);
 			if (mkdir(path2, 0700) == -1 ||
 			    semanage_copy_dir_flags(path, path2, flag) == -1) {
+				umask(mask);
 				goto cleanup;
 			}
+			umask(mask);
 		} else if (S_ISREG(sb.st_mode) && flag == 1) {
-			if (semanage_copy_file(path, path2, sb.st_mode) < 0) {
+			mask = umask(0077);
+			if (semanage_copy_file(path, path2, sb.st_mode,
+						false) < 0) {
+				umask(mask);
 				goto cleanup;
 			}
+			umask(mask);
 		}
 	}
 	retval = 0;
@@ -872,16 +904,20 @@ int semanage_mkdir(semanage_handle_t *sh, const char *path)
 {
 	int status = 0;
 	struct stat sb;
+	mode_t mask;
 
 	/* check if directory already exists */
 	if (stat(path, &sb) != 0) {
 		/* make the modules directory */
+		mask = umask(0077);
 		if (mkdir(path, S_IRWXU) != 0) {
+			umask(mask);
 			ERR(sh, "Cannot make directory at %s", path);
 			status = -1;
 			goto cleanup;
 
 		}
+		umask(mask);
 	}
 	else {
 		/* check that it really is a directory */
@@ -906,6 +942,7 @@ int semanage_make_sandbox(semanage_handle_t * sh)
 	const char *sandbox = semanage_path(SEMANAGE_TMP, SEMANAGE_TOPLEVEL);
 	struct stat buf;
 	int errsv;
+	mode_t mask;
 
 	if (stat(sandbox, &buf) == -1) {
 		if (errno != ENOENT) {
@@ -922,12 +959,15 @@ int semanage_make_sandbox(semanage_handle_t * sh)
 		}
 	}
 
+	mask = umask(0077);
 	if (mkdir(sandbox, S_IRWXU) == -1 ||
 	    semanage_copy_dir(semanage_path(SEMANAGE_ACTIVE, SEMANAGE_TOPLEVEL),
 			      sandbox) == -1) {
+		umask(mask);
 		ERR(sh, "Could not copy files to sandbox %s.", sandbox);
 		goto cleanup;
 	}
+	umask(mask);
 	return 0;
 
       cleanup:
@@ -1445,7 +1485,6 @@ int semanage_reload_policy(semanage_handle_t * sh)
 	return r;
 }
 
-hidden_def(semanage_reload_policy)
 
 /* This expands the file_context.tmpl file to file_context and homedirs.template */
 int semanage_split_fc(semanage_handle_t * sh)
@@ -1609,7 +1648,8 @@ static int semanage_install_final_tmp(semanage_handle_t * sh)
 			goto cleanup;
 		}
 
-		ret = semanage_copy_file(src, dst, sh->conf->file_mode);
+		ret = semanage_copy_file(src, dst, sh->conf->file_mode,
+					true);
 		if (ret < 0) {
 			ERR(sh, "Could not copy %s to %s.", src, dst);
 			goto cleanup;

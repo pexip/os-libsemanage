@@ -6,9 +6,9 @@ Section: libdevel
 Maintainer: Debian SELinux maintainers <selinux-devel@lists.alioth.debian.org>
 Uploaders: Laurent Bigonville <bigon@debian.org>,
            Russell Coker <russell@coker.com.au>
-Standards-Version: 4.3.0
+Standards-Version: 4.5.0
 Build-Depends: bison,
-               debhelper (>= 10),
+               debhelper-compat (= 12),
                dh-python <!nopython>,
                file,
                flex,
@@ -16,14 +16,15 @@ Build-Depends: bison,
                libaudit-dev,
                libbz2-dev,
                libcunit1-dev <!nocheck>,
-               libselinux1-dev (>= 2.8),
-               libsepol1-dev (>= 2.8),
+               libselinux1-dev (>= 3.1),
+               libsepol1-dev (>= 3.1),
                pkg-config,
-               python-all-dev (>= 2.6.6-3~) <!nopython>,
                python3-all-dev <!nopython>,
+               secilc (>= 3.1) <!nocheck>,
                swig <!nopython> <!noruby>
 Homepage: http://userspace.selinuxproject.org/
 XS-Ruby-Versions: all
+Rules-Requires-Root: no
 
 Package: libsemanage-common
 Architecture: all
@@ -52,7 +53,7 @@ Section: libs
 Depends: libsemanage-common (= ${source:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: policycoreutils (<< 2.4),
+Breaks: policycoreutils (<< 3.0),
         selinux-policy-default (<< 2:2.20140421-10~),
         selinux-policy-mls (<< 2:2.20140421-10~)
 Pre-Depends: ${misc:Pre-Depends}
@@ -79,13 +80,14 @@ Description: SELinux policy management library
 Package: libsemanage1-dev
 Architecture: linux-any
 Depends: libbz2-dev,
-         libselinux1-dev (>= 2.8),
+         libselinux1-dev (>= 3.1),
          libsemanage1 (= ${binary:Version}),
-         libsepol1-dev (>= 2.8),
+         libsepol1-dev (>= 3.1),
          ${misc:Depends},
          ${shlibs:Depends}
 Provides: libsemanage-dev
 Conflicts: libsemanage-dev
+Multi-Arch: same
 Description: Header files and libraries for SELinux policy manipulation
  This package provides an API for the management of SELinux policies.
  It contains the static libraries and header files needed
@@ -107,28 +109,10 @@ Depends: ruby | ruby-interpreter, ${misc:Depends}, ${shlibs:Depends}
 Section: ruby
 Build-Profiles: <!noruby>
 XB-Ruby-Versions: ${ruby:Versions}
+Multi-Arch: same
 Description: Ruby bindings to for SELinux policy management
  This package provides the Ruby bindings needed for developing Ruby
  applications that manage SELinux policies.
- .
- Security-enhanced Linux is a patch of the Linux kernel and a
- number of utilities with enhanced security functionality designed to
- add mandatory access controls to Linux.  The Security-enhanced Linux
- kernel contains new architectural components originally developed to
- improve the security of the Flask operating system. These
- architectural components provide general support for the enforcement
- of many kinds of mandatory access control policies, including those
- based on the concepts of Type Enforcement, Role-based Access
- Control, and Multi-level Security.
-
-Package: python-semanage
-Architecture: linux-any
-Depends: ${misc:Depends}, ${python:Depends}, ${shlibs:Depends}
-Section: python
-Build-Profiles: <!nopython>
-Description: Python bindings for SELinux policy management
- This package provides Python bindings for the management of SELinux
- policies.
  .
  Security-enhanced Linux is a patch of the Linux kernel and a
  number of utilities with enhanced security functionality designed to
@@ -161,10 +145,10 @@ Description: Python3 bindings for SELinux policy management
 
 Package: semanage-utils
 Architecture: linux-any
-Depends: libsepol1 (>= 2.8),
+Depends: libsepol1 (>= 3.1),
          python3 (>= 3.2),
-         python3-selinux (>= 2.8),
-         python3-semanage (>= 2.8),
+         python3-selinux (>= 3.1),
+         python3-semanage (>= 3.1),
          ${misc:Depends},
          ${python3:Depends}
 Section: admin

@@ -28,8 +28,10 @@
 #include <semanage/fcontexts_policy.h>
 #include <sepol/context.h>
 #include <sepol/context_record.h>
+#include "fcontext_internal.h"
 #include "semanage_store.h"
 #include "seuser_internal.h"
+#include "user_internal.h"
 #include "debug.h"
 
 #include "utilities.h"
@@ -361,7 +363,11 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 
 	errno = 0;
 	setpwent();
-	while ((pwbuf = getpwent()) != NULL) {
+	while (1) {
+		errno = 0;
+		pwbuf = getpwent();
+		if (pwbuf == NULL)
+			break;
 		if (pwbuf->pw_uid < minuid || pwbuf->pw_uid > maxuid)
 			continue;
 		if (!semanage_list_find(shells, pwbuf->pw_shell))
@@ -403,7 +409,6 @@ static semanage_list_t *get_home_dirs(genhomedircon_settings_t * s)
 		}
 		free(path);
 		path = NULL;
-		errno = 0;
 	}
 
 	if (errno) {
@@ -1074,10 +1079,24 @@ static int get_group_users(genhomedircon_settings_t * s,
 
 	const char *grname = selogin + 1;
 
-	if (getgrnam_r(grname, &grstorage, grbuf,
-			(size_t) grbuflen, &group) != 0) {
-		goto cleanup;
+	errno = 0;
+	while (
+		(retval = getgrnam_r(grname, &grstorage, grbuf, (size_t) grbuflen, &group)) != 0 &&
+		errno == ERANGE
+	) {
+		char *new_grbuf;
+		grbuflen *= 2;
+		if (grbuflen < 0)
+			/* the member list could exceed 2Gb on a system with a 32-bit CPU (where
+			 * sizeof(long) = 4) - if this ever happened, the loop would become infinite. */
+			goto cleanup;
+		new_grbuf = realloc(grbuf, grbuflen);
+		if (new_grbuf == NULL)
+			goto cleanup;
+		grbuf = new_grbuf;
 	}
+	if (retval != 0)
+		goto cleanup;
 
 	if (group == NULL) {
 		ERR(s->h_semanage, "Can't find group named %s\n", grname);
@@ -1101,7 +1120,11 @@ static int get_group_users(genhomedircon_settings_t * s,
 	}
 
 	setpwent();
-	while ((pw = getpwent()) != NULL) {
+	while (1) {
+		errno = 0;
+		pw = getpwent();
+		if (pw == NULL)
+			break;
 		// skip users who also have this group as their
 		// primary group
 		if (lfind(pw->pw_name, group->gr_mem, &nmembers,

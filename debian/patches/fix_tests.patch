@@ -1,0 +1,14 @@
+Description: Fix the tests to run from the released tarball
+Author: Laurent Bigonville <bigon@debian.org>
+
+--- a/tests/Makefile
++++ b/tests/Makefile
+@@ -18,7 +18,7 @@ $(EXECUTABLE): $(OBJECTS) ../src/libsema
+ 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+ 
+ %.policy: %.cil
+-	../../secilc/secilc $*.cil -o $*.policy -f /dev/null
++	secilc $*.cil -o $*.policy -f /dev/null
+ 
+ clean distclean: 
+ 	rm -rf $(OBJECTS) $(POLICIES) $(EXECUTABLE)

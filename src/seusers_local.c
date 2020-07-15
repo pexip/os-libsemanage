@@ -71,16 +71,17 @@ static int semanage_seuser_audit(semanage_handle_t * handle,
 	const char *sep = "-";
 	int rc = -1;
 	strcpy(msg, "login");
+	if (previous) {
+		name = semanage_seuser_get_name(previous);
+		psename = semanage_seuser_get_sename(previous);
+		pmls = semanage_seuser_get_mlsrange(previous);
+		proles = semanage_user_roles(handle, psename);
+	}
 	if (seuser) {
 		name = semanage_seuser_get_name(seuser);
 		sename = semanage_seuser_get_sename(seuser);
 		mls = semanage_seuser_get_mlsrange(seuser);
 		roles = semanage_user_roles(handle, sename);
-	}
-	if (previous) {
-		psename = semanage_seuser_get_sename(previous);
-		pmls = semanage_seuser_get_mlsrange(previous);
-		proles = semanage_user_roles(handle, psename);
 	}
 	if (audit_type != AUDIT_ROLE_REMOVE) {
 		if (sename && (!psename || strcmp(psename, sename) != 0)) {
@@ -132,7 +133,7 @@ int semanage_seuser_modify_local(semanage_handle_t * handle,
 	semanage_seuser_t *new = NULL;
 
 	if (!sename) {
-		errno=EINVAL;
+		errno = EINVAL;
 		return -1;
 	}
 	rc = semanage_seuser_clone(handle, data, &new);
@@ -222,7 +223,6 @@ int semanage_seuser_iterate_local(semanage_handle_t * handle,
 	return dbase_iterate(handle, dconfig, handler, handler_arg);
 }
 
-hidden_def(semanage_seuser_iterate_local)
 
 int semanage_seuser_list_local(semanage_handle_t * handle,
 			       semanage_seuser_t *** records,
@@ -319,7 +319,7 @@ static int validate_handler(const semanage_seuser_t * seuser, void *varg)
  * it will (1) deadlock, because iterate is not reentrant outside
  * a transaction, and (2) be racy, because it makes multiple dbase calls */
 
-int hidden semanage_seuser_validate_local(semanage_handle_t * handle,
+int semanage_seuser_validate_local(semanage_handle_t * handle,
 					  const sepol_policydb_t * policydb)
 {
 
