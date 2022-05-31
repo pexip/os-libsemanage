@@ -25,7 +25,7 @@ Build-Depends: bison,
                swig <!nopython> <!noruby>
 Homepage: http://userspace.selinuxproject.org/
 XS-Ruby-Versions: all
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ buster
+XS-Pexip-Upstream: http://deb.debian.org/debian/ bullseye
 
 Package: libsemanage-common
 Architecture: all
