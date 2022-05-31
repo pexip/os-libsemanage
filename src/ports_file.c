@@ -15,7 +15,6 @@ typedef struct dbase_file dbase_t;
 #include <strings.h>
 #include <semanage/handle.h>
 #include "port_internal.h"
-#include "context_internal.h"
 #include "database_file.h"
 #include "parse_utils.h"
 #include "debug.h"
@@ -84,6 +83,10 @@ static int port_parse(semanage_handle_t * handle,
 		semanage_port_set_proto(port, SEMANAGE_PROTO_TCP);
 	else if (!strcasecmp(str, "udp"))
 		semanage_port_set_proto(port, SEMANAGE_PROTO_UDP);
+	else if (!strcasecmp(str, "dccp"))
+		semanage_port_set_proto(port, SEMANAGE_PROTO_DCCP);
+	else if (!strcasecmp(str, "sctp"))
+		semanage_port_set_proto(port, SEMANAGE_PROTO_SCTP);
 	else {
 		ERR(handle, "invalid protocol \"%s\" (%s: %u):\n%s", str,
 		    info->filename, info->lineno, info->orig_line);
