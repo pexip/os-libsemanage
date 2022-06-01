@@ -517,7 +517,7 @@ ssize_t bunzip(semanage_handle_t *sh, FILE *f, char **data)
 	size_t  size = 1<<18;
 	size_t  bufsize = size;
 	int     bzerror;
-	size_t  total=0;
+	size_t  total = 0;
 	char*   uncompress = NULL;
 	char*   tmpalloc = NULL;
 	int     ret = -1;
@@ -1188,7 +1188,7 @@ cleanup:
  * overwrite it. If source doesn't exist then return success.
  * Returns 0 on success, -1 on error. */
 static int copy_file_if_exists(const char *src, const char *dst, mode_t mode){
-	int rc = semanage_copy_file(src, dst, mode);
+	int rc = semanage_copy_file(src, dst, mode, false);
 	return (rc < 0 && errno != ENOENT) ? rc : 0;
 }
 
@@ -1461,6 +1461,13 @@ rebuild:
 
 		cil_db_destroy(&cildb);
 
+		/* Remove redundancies in binary policy if requested. */
+		if (sh->conf->optimize_policy) {
+			retval = sepol_policydb_optimize(out);
+			if (retval < 0)
+				goto cleanup;
+		}
+
 		/* Write the linked policy before merging local changes. */
 		retval = semanage_write_policydb(sh, out,
 						 SEMANAGE_LINKED);
@@ -1481,7 +1488,7 @@ rebuild:
 			retval = semanage_copy_file(path,
 						    semanage_path(SEMANAGE_TMP,
 								  SEMANAGE_STORE_SEUSERS),
-						    0);
+						    0, false);
 			if (retval < 0)
 				goto cleanup;
 			pseusers->dtable->drop_cache(pseusers->dbase);
@@ -1499,7 +1506,7 @@ rebuild:
 			retval = semanage_copy_file(path,
 						    semanage_path(SEMANAGE_TMP,
 								  SEMANAGE_USERS_EXTRA),
-						    0);
+						    0, false);
 			if (retval < 0)
 				goto cleanup;
 			pusers_extra->dtable->drop_cache(pusers_extra->dbase);
@@ -1588,7 +1595,7 @@ rebuild:
 
 	retval = semanage_copy_file(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_KERNEL),
 			semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_KERNEL),
-			sh->conf->file_mode);
+			sh->conf->file_mode, false);
 	if (retval < 0) {
 		goto cleanup;
 	}
@@ -1627,7 +1634,7 @@ rebuild:
 			retval = semanage_copy_file(
 						semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_HOMEDIRS),
 						semanage_final_path(SEMANAGE_FINAL_TMP,	SEMANAGE_FC_HOMEDIRS),
-						sh->conf->file_mode);
+						sh->conf->file_mode, false);
 			if (retval < 0) {
 				goto cleanup;
 			}

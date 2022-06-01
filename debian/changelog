@@ -1,3 +1,71 @@
+libsemanage (3.1-1) unstable; urgency=medium
+
+  [ Debian Janitor ]
+  * Trim trailing whitespace.
+  * Set debhelper-compat version in Build-Depends.
+  * Set upstream metadata fields: Bug-Database, Repository, Repository-
+    Browse.
+
+  [ Laurent Bigonville ]
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+  * Set upstream metadata fields: Bug-Submit.
+  * debian/gitlab-ci.yml: Add salsa CI
+  * debian/rules: Clean the ruby bindings built for all versions, this fixes
+    the ability to build the package twice (Closes: #951630)
+  * debian/rules: Call dh_auto_clean even if we are not building any bindings
+  * debian/rules: Add support to run make in parallel
+  * Move semanage_migrate_store to /usr/libexec/selinux
+  * debian/control: Set Rules-Requires-Root: no
+  * debian/rules: Add -fno-semantic-interposition to the CFLAGS
+
+  [ Debian Janitor ]
+  * Wrap long lines in changelog entries: 1.6-1.
+  * Update standards version to 4.5.0, no changes needed.
+
+ -- Laurent Bigonville <bigon@debian.org>  Wed, 15 Jul 2020 09:58:16 +0200
+
+libsemanage (3.0-1) unstable; urgency=medium
+
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+    - d/p/fix_tests.patch: Fix the tests to run from the released tarball and
+      add secilc to the Build-dependencies
+  * Bump Standards-Version to 4.4.1 (no further changes)
+  * Bump debhelper compatibility to 12
+  * Drop d/p/libexec-path.patch: look for hll compiler in /usr/libexec add
+    Breaks against policycoreutils << 3.0 to be sure the exec is installed
+
+ -- Laurent Bigonville <bigon@debian.org>  Thu, 12 Dec 2019 11:47:10 +0100
+
+libsemanage (2.9-3) unstable; urgency=medium
+
+  * Drop python-semanage package, python 2 is EOL and it has not rdeps
+  * Bump Standards-Version to 4.4.0 (no further changes)
+
+ -- Laurent Bigonville <bigon@debian.org>  Mon, 22 Jul 2019 01:51:03 +0200
+
+libsemanage (2.9-2) unstable; urgency=medium
+
+  * Upload to unstable
+  * debian/control: Mark libsemanage1-dev and ruby-semanage as Multi-Arch same
+
+ -- Laurent Bigonville <bigon@debian.org>  Sun, 07 Jul 2019 23:18:44 +0200
+
+libsemanage (2.9-1) experimental; urgency=medium
+
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+  * debian/watch: Adjust the URL
+  * debian/patches/semigrate-store.patch: Refreshed
+  * d/p/0001-libsemanage-Always-set-errno-to-0-before-calling-get.patch:
+    Dropped, applied upstream
+  * debian/libsemanage-common.install: Install manpages in Russian
+  * debian/patches/libexec-path.patch: Also fix the path in the Russian
+    manpage
+
+ -- Laurent Bigonville <bigon@debian.org>  Mon, 18 Mar 2019 14:30:12 +0100
+
 libsemanage (2.8-2pexip2) pexip; urgency=medium
 
   * Rebuild in buster environment
@@ -13,7 +81,7 @@ libsemanage (2.8-2pexip1) pexip; urgency=medium
 libsemanage (2.8-2) unstable; urgency=medium
 
   * d/p/0001-libsemanage-Always-set-errno-to-0-before-calling-get.patch:
-    Fix boggus error message when calling genhomedircon
+    Fix bogus error message when calling genhomedircon
   * Bump Standards-Version to 4.3.0 (no further changes)
 
  -- Laurent Bigonville <bigon@debian.org>  Sun, 06 Jan 2019 13:09:51 +0100
@@ -359,7 +427,7 @@ libsemanage (2.0.45-1) unstable; urgency=low
       glibc < 2.9 does not support binary mode ('b') for fmemopen'd
       streams.
     * Move libsemanage.so to /usr/lib
-    * Add NAME lines to man pages from Manoj Srivastava 
+    * Add NAME lines to man pages from Manoj Srivastava
       <srivasta@debian.org>
 
 
@@ -367,7 +435,7 @@ libsemanage (2.0.45-1) unstable; urgency=low
 
 libsemanage (2.0.42-1) unstable; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
     Move load_policy from /usr/sbin to /sbin from Dan Walsh.
 
  -- Manoj Srivastava <srivasta@debian.org>  Fri, 20 Nov 2009 01:33:34 -0600
@@ -376,7 +444,7 @@ libsemanage (2.0.41-2) unstable; urgency=low
 
   * Pull out the common files under /etc from the shared library package,
     since it is a policy violation. Added a -common package to hold the
-    file. 
+    file.
 
  -- Manoj Srivastava <srivasta@debian.org>  Tue, 17 Nov 2009 23:51:50 -0600
 
@@ -391,7 +459,7 @@ libsemanage (2.0.40-1) unstable; urgency=low
 
   * New upstream point release
     + Add semanage_set_check_contexts() function to disable calling
-      setfiles 
+      setfiles
 
  -- Manoj Srivastava <srivasta@debian.org>  Sun, 25 Oct 2009 14:02:11 -0500
 
@@ -401,7 +469,7 @@ libsemanage (2.0.39-1) unstable; urgency=low
     + Change semodule upgrade behavior to install even if the module
       is not present from Dan Walsh.
     + Make genhomedircon trim excess '/' from homedirs from Dan Walsh.
-    + Fix persistent dontaudit support to rebuild policy if the 
+    + Fix persistent dontaudit support to rebuild policy if the
       dontaudit state is changed from Chad Sellers.
     The first change is nice, since now you may just isntall a policy
     module using semodule, without having to check if the module was
@@ -837,7 +905,8 @@ libsemanage (1.6-1) unstable; urgency=low
     * Merged toggle modify on add patch from Ivan Gyurdiev.
     * Merged ports parser bugfix patch from Ivan Gyurdiev.
     * Merged fcontext swig patch from Ivan Gyurdiev.
-    * Merged remove add/modify/delete for active booleans patch from Ivan Gyurdiev.
+    * Merged remove add/modify/delete for active booleans patch from Ivan
+      Gyurdiev.
     * Merged man pages for dbase functions patch from Ivan Gyurdiev.
     * Merged pywrap tests patch from Ivan Gyurdiev.
 
@@ -1015,4 +1084,3 @@ libsemanage (1.2-1) unstable; urgency=low
   * New package.
 
  -- Manoj Srivastava <srivasta@debian.org>  Wed, 14 Sep 2005 23:21:42 -0500
-

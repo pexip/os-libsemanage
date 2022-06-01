@@ -4,18 +4,12 @@ Forwarded: not-needed
 
 --- a/utils/semanage_migrate_store
 +++ b/utils/semanage_migrate_store
-@@ -1,4 +1,4 @@
--#!/usr/bin/python -E
-+#!/usr/bin/python3 -E
- 
- 
- from __future__ import print_function
-@@ -16,7 +16,7 @@ try:
- 	import selinux
- 	import semanage
- except:
--	print("You must install libselinux-python and libsemanage-python before running this tool", file=sys.stderr)
-+	print("You must install python3-selinux and python3-semanage before running this tool", file=sys.stderr)
- 	exit(1)
+@@ -13,7 +13,7 @@
+     import selinux
+     import semanage
+ except ImportError:
+-    print("You must install libselinux-python and libsemanage-python before running this tool", file=sys.stderr)
++    print("You must install python3-selinux and python3-semanage before running this tool", file=sys.stderr)
+     exit(1)
  
  
