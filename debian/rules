@@ -1,6 +1,8 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
 include /usr/share/dpkg/architecture.mk
 # for cross compilation
 ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
@@ -28,8 +30,8 @@ endif
 # Upstream recommends using this flag
 export DEB_CFLAGS_MAINT_APPEND = -fno-semantic-interposition
 # The build system doesn't use CPPFLAGS, pass them to CFLAGS to enable the
-# missing (hardening) flags.
-export DEB_CFLAGS_MAINT_APPEND += $(shell dpkg-buildflags --get CPPFLAGS)
+# missing (hardening) flags. Also enable Wall and Wextra to spot basic irregularities.
+export DEB_CFLAGS_MAINT_APPEND += $(shell dpkg-buildflags --get CPPFLAGS) -Wall -Wextra
 
 %:
 	dh $@ $(DH_ADDONS)
@@ -76,9 +78,6 @@ ifneq ($(filter ruby-semanage,$(DOPACKAGES)),)
 	  $(MAKE) clean RUBY=$$version; \
 	done;
 endif
-
-override_dh_missing:
-	dh_missing --list-missing
 
 override_dh_fixperms:
 	dh_fixperms

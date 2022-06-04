@@ -1,5 +1,6 @@
 Description: Fix the tests to run from the released tarball
 Author: Laurent Bigonville <bigon@debian.org>
+Forwarded: not-needed
 
 --- a/tests/Makefile
 +++ b/tests/Makefile

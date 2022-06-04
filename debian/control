@@ -1,14 +1,14 @@
 Source: libsemanage
-VCS-Git: https://salsa.debian.org/selinux-team/libsemanage.git
-VCS-Browser: https://salsa.debian.org/selinux-team/libsemanage
+Vcs-Git: https://salsa.debian.org/selinux-team/libsemanage.git
+Vcs-Browser: https://salsa.debian.org/selinux-team/libsemanage
 Priority: optional
 Section: libdevel
 Maintainer: Debian SELinux maintainers <selinux-devel@lists.alioth.debian.org>
 Uploaders: Laurent Bigonville <bigon@debian.org>,
            Russell Coker <russell@coker.com.au>
-Standards-Version: 4.5.0
+Standards-Version: 4.6.0
 Build-Depends: bison,
-               debhelper-compat (= 12),
+               debhelper-compat (= 13),
                dh-python <!nopython>,
                file,
                flex,
@@ -16,13 +16,13 @@ Build-Depends: bison,
                libaudit-dev,
                libbz2-dev,
                libcunit1-dev <!nocheck>,
-               libselinux1-dev (>= 3.1),
-               libsepol1-dev (>= 3.1),
+               libselinux1-dev (>= 3.4),
+               libsepol-dev (>= 3.4),
                pkg-config,
                python3-all-dev <!nopython>,
-               secilc (>= 3.1) <!nocheck>,
+               secilc (>= 3.4) <!nocheck>,
                swig <!nopython> <!noruby>
-Homepage: http://userspace.selinuxproject.org/
+Homepage: https://selinuxproject.org
 XS-Ruby-Versions: all
 Rules-Requires-Root: no
 
@@ -30,8 +30,6 @@ Package: libsemanage-common
 Architecture: all
 Section: libs
 Depends: ${misc:Depends}
-Breaks: libsemanage1 (<= 2.0.41-1), libsemanage1-dev (<< 2.1.6-3~)
-Replaces: libsemanage1 (<= 2.0.41-1), libsemanage1-dev (<< 2.1.6-3~)
 Multi-Arch: foreign
 Description: Common files for SELinux policy management libraries
  This package provides the common files used by the shared libraries
@@ -47,15 +45,13 @@ Description: Common files for SELinux policy management libraries
  based on the concepts of Type Enforcement, Role-based Access
  Control, and Multi-level Security.
 
-Package: libsemanage1
+Package: libsemanage2
 Architecture: linux-any
 Section: libs
-Depends: libsemanage-common (= ${source:Version}),
+Depends: libsemanage-common (>= ${source:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Breaks: policycoreutils (<< 3.0),
-        selinux-policy-default (<< 2:2.20140421-10~),
-        selinux-policy-mls (<< 2:2.20140421-10~)
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
 Description: SELinux policy management library
@@ -77,16 +73,16 @@ Description: SELinux policy management library
  based on the concepts of Type Enforcement, Role-based Access
  Control, and Multi-level Security.
 
-Package: libsemanage1-dev
+Package: libsemanage-dev
 Architecture: linux-any
 Depends: libbz2-dev,
-         libselinux1-dev (>= 3.1),
-         libsemanage1 (= ${binary:Version}),
-         libsepol1-dev (>= 3.1),
+         libselinux1-dev (>= 3.4),
+         libsemanage2 (= ${binary:Version}),
+         libsepol-dev (>= 3.4),
          ${misc:Depends},
          ${shlibs:Depends}
-Provides: libsemanage-dev
-Conflicts: libsemanage-dev
+Breaks: libsemanage1-dev (<< 3.2)
+Replaces: libsemanage1-dev (<< 3.2)
 Multi-Arch: same
 Description: Header files and libraries for SELinux policy manipulation
  This package provides an API for the management of SELinux policies.
@@ -144,11 +140,11 @@ Description: Python3 bindings for SELinux policy management
  Control, and Multi-level Security.
 
 Package: semanage-utils
-Architecture: linux-any
-Depends: libsepol1 (>= 3.1),
+Architecture: all
+Depends: libsepol2 (>= 3.4),
          python3 (>= 3.2),
-         python3-selinux (>= 3.1),
-         python3-semanage (>= 3.1),
+         python3-selinux (>= 3.4),
+         python3-semanage (>= 3.4),
          ${misc:Depends},
          ${python3:Depends}
 Section: admin

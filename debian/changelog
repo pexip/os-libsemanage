@@ -1,3 +1,45 @@
+libsemanage (3.4-1) unstable; urgency=medium
+
+  * New upstream release
+    - debian/control: Bump {build-}dependencies to match new release
+    - debian/libsemanage2.symbols: Add newly exported symbols
+  * Enable GPG key validation of the upstream tarball
+
+ -- Laurent Bigonville <bigon@debian.org>  Sat, 04 Jun 2022 19:10:35 +0200
+
+libsemanage (3.3-1) unstable; urgency=medium
+
+  [ Christian Göttsche ]
+  * d/gitlab-ci.yml: Use Debian recipe
+  * d/control: Bump debhelper compat to level 13
+  * d/control: Bump Standards-Version to 4.5.1 (no further changes)
+  * d/control: Update homepage
+  * d/rules: Enable build hardening
+  * d/rules: Enable -Wall -Wextra
+  * d/control: Convert cute fields
+  * d/control: Declare semanage-utils Architecture all
+
+  [ Laurent Bigonville ]
+  * debian/control: Properly depend against libsepol2 instead of libsepol1
+  * New upstream version 3.3
+    - debian/control: Bump {build-}dependencies to match new release
+  * debian/control: Bump Standards-Version to 4.6.0 (no further changes)
+  * debian/control: Relax the versioned dependency against -common a bit
+
+ -- Laurent Bigonville <bigon@debian.org>  Mon, 08 Nov 2021 15:01:36 +0100
+
+libsemanage (3.2-1) experimental; urgency=medium
+
+  * New upstream version
+    - debian/control: Bump {build-}dependencies to match new release
+    - Bump the soname from 1 to 2, drop the soname from the -dev package
+  * debian/watch: Update the URL to follow the new tagging format
+  * debian/control: Drop ancients Breaks against selinux-policy-default and
+    selinux-policy-mls
+  * debian/patches/fix_tests.patch: Add the Forwarded tag to please lintian
+
+ -- Laurent Bigonville <bigon@debian.org>  Sat, 24 Apr 2021 13:52:18 +0200
+
 libsemanage (3.1-1) unstable; urgency=medium
 
   [ Debian Janitor ]
