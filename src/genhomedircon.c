@@ -490,7 +490,7 @@ static int STR_COMPARATOR(const void *a, const void *b)
 	return strcmp((const char *) a, (const char *) b);
 }
 
-/* make_tempate
+/* make_template
  * @param	s	  the settings holding the paths to various files
  * @param	pred	function pointer to function to use as filter for slurp
  * 					file filter
@@ -740,7 +740,7 @@ static int write_user_context(genhomedircon_settings_t * s, FILE * out,
 static int seuser_sort_func(const void *arg1, const void *arg2)
 {
 	const semanage_seuser_t **u1 = (const semanage_seuser_t **) arg1;
-	const semanage_seuser_t **u2 = (const semanage_seuser_t **) arg2;;
+	const semanage_seuser_t **u2 = (const semanage_seuser_t **) arg2;
 	const char *name1 = semanage_seuser_get_name(*u1);
 	const char *name2 = semanage_seuser_get_name(*u2);
 
