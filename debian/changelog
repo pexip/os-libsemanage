@@ -1,3 +1,9 @@
+libsemanage (3.4-1pexip1) pexip-bookworm; urgency=medium
+
+  * Initial bookworm build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 16 Nov 2023 10:07:51 +0000
+
 libsemanage (3.4-1) unstable; urgency=medium
 
   * New upstream release
