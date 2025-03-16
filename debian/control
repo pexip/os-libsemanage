@@ -6,21 +6,23 @@ Section: libdevel
 Maintainer: Debian SELinux maintainers <selinux-devel@lists.alioth.debian.org>
 Uploaders: Laurent Bigonville <bigon@debian.org>,
            Russell Coker <russell@coker.com.au>
-Standards-Version: 4.6.0
+Standards-Version: 4.6.2
 Build-Depends: bison,
                debhelper-compat (= 13),
-               dh-python <!nopython>,
+               dh-sequence-python3 <!nopython>,
+               dh-sequence-ruby <!noruby>,
                file,
                flex,
                gem2deb (>= 0.5.0~) <!noruby>,
                libaudit-dev,
                libbz2-dev,
                libcunit1-dev <!nocheck>,
-               libselinux1-dev (>= 3.4),
-               libsepol-dev (>= 3.4),
+               libpython3-all-dev <!nopython>,
+               libselinux1-dev (>= 3.8.1),
+               libsepol-dev (>= 3.8.1),
                pkg-config,
-               python3-all-dev <!nopython>,
-               secilc (>= 3.4) <!nocheck>,
+               python3-all-dev:any <!nopython>,
+               secilc (>= 3.8.1) <!nocheck>,
                swig <!nopython> <!noruby>
 Homepage: https://selinuxproject.org
 XS-Ruby-Versions: all
@@ -51,7 +53,6 @@ Section: libs
 Depends: libsemanage-common (>= ${source:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: policycoreutils (<< 3.0),
 Pre-Depends: ${misc:Pre-Depends}
 Multi-Arch: same
 Description: SELinux policy management library
@@ -76,13 +77,11 @@ Description: SELinux policy management library
 Package: libsemanage-dev
 Architecture: linux-any
 Depends: libbz2-dev,
-         libselinux1-dev (>= 3.4),
+         libselinux1-dev (>= 3.8.1),
          libsemanage2 (= ${binary:Version}),
-         libsepol-dev (>= 3.4),
+         libsepol-dev (>= 3.8.1),
          ${misc:Depends},
          ${shlibs:Depends}
-Breaks: libsemanage1-dev (<< 3.2)
-Replaces: libsemanage1-dev (<< 3.2)
 Multi-Arch: same
 Description: Header files and libraries for SELinux policy manipulation
  This package provides an API for the management of SELinux policies.
@@ -101,7 +100,7 @@ Description: Header files and libraries for SELinux policy manipulation
 
 Package: ruby-semanage
 Architecture: linux-any
-Depends: ruby | ruby-interpreter, ${misc:Depends}, ${shlibs:Depends}
+Depends: ${ruby:Depends}, ${misc:Depends}, ${shlibs:Depends}
 Section: ruby
 Build-Profiles: <!noruby>
 XB-Ruby-Versions: ${ruby:Versions}
@@ -141,10 +140,10 @@ Description: Python3 bindings for SELinux policy management
 
 Package: semanage-utils
 Architecture: all
-Depends: libsepol2 (>= 3.4),
+Depends: libsepol2 (>= 3.8.1),
          python3 (>= 3.2),
-         python3-selinux (>= 3.4),
-         python3-semanage (>= 3.4),
+         python3-selinux (>= 3.8.1),
+         python3-semanage (>= 3.8.1),
          ${misc:Depends},
          ${python3:Depends}
 Section: admin

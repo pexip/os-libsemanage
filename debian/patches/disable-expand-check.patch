@@ -3,9 +3,11 @@ Description: Disable expand-check
 Forwarded: not-needed
 Bug-Debian: http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=720220
 
---- a/src/semanage.conf
-+++ b/src/semanage.conf
-@@ -36,6 +36,10 @@ module-store = direct
+Index: libsemanage-3.8/src/semanage.conf
+===================================================================
+--- libsemanage-3.8.orig/src/semanage.conf
++++ libsemanage-3.8/src/semanage.conf
+@@ -37,6 +37,10 @@ module-store = direct
  # version is necessary.
  #policy-version = 19
  
