@@ -1,3 +1,53 @@
+libsemanage (3.8.1-1) unstable; urgency=medium
+
+  * 3.8.1 upstream release, performance fix
+  * Add patch for semanage.conf(5) from Bjarni Ingi Gislason
+    Close: #950196  Close: #1096015
+
+ -- Russell Coker <russell@coker.com.au>  Sun, 16 Mar 2025 18:46:12 +1100
+
+libsemanage (3.8-1) unstable; urgency=medium
+
+  * 3.8 upstream release
+
+ -- Russell Coker <russell@coker.com.au>  Thu, 06 Feb 2025 22:57:00 +1100
+
+libsemanage (3.7-2) unstable; urgency=medium
+
+  * Make libsemanage-dev depend on libselinux1-dev
+
+ -- Russell Coker <russell@coker.com.au>  Fri, 30 Aug 2024 13:44:45 +1000
+
+libsemanage (3.7-1) unstable; urgency=medium
+
+  * New upstream release
+  * Change libsemanage-dev to depend on libselinux-dev
+  * Add extra upstream signing key for Petr Lautrbach
+  * Remove libsemanage-common.install line for russian man pages
+
+ -- Russell Coker <russell@coker.com.au>  Sun, 25 Aug 2024 21:21:22 +1000
+
+libsemanage (3.5-1) unstable; urgency=medium
+
+  [ Laurent Bigonville ]
+  * New upstream release
+    - debian/rules: Properly set the install layout for the python module
+    - debian/control: Bump {build-}dependencies to match new release
+  * debian/upstream/signing-key.asc: Add public key of Jason Zaman
+  * debian/control: Bump Standards-Version to 4.6.2 (no further changes)
+  * debian/control: Drop ancient Breaks/Replaces
+  * debian/control: Drop dependency against ruby | ruby-interpreter, to please
+    lintian
+
+  [ Helmut Grohne ]
+  * Fix FTCBFS: Support cross building python and ruby extensions.
+    (Closes: #1022967)
+
+  [ Bastian Germann ]
+  * Fix "Inaccurate copyright file" (Closes: #1031797)
+
+ -- Laurent Bigonville <bigon@debian.org>  Mon, 10 Jul 2023 20:43:07 +0200
+
 libsemanage (3.4-1+pexip24u4) pexip-bookworm; urgency=medium
 
   * New versioning scheme

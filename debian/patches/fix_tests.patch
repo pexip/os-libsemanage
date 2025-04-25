@@ -2,8 +2,10 @@ Description: Fix the tests to run from the released tarball
 Author: Laurent Bigonville <bigon@debian.org>
 Forwarded: not-needed
 
---- a/tests/Makefile
-+++ b/tests/Makefile
+Index: libsemanage-3.8/tests/Makefile
+===================================================================
+--- libsemanage-3.8.orig/tests/Makefile
++++ libsemanage-3.8/tests/Makefile
 @@ -18,7 +18,7 @@ $(EXECUTABLE): $(OBJECTS) ../src/libsema
  	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
  
@@ -11,5 +13,5 @@ Forwarded: not-needed
 -	../../secilc/secilc $*.cil -o $*.policy -f /dev/null
 +	secilc $*.cil -o $*.policy -f /dev/null
  
- clean distclean: 
+ clean distclean:
  	rm -rf $(OBJECTS) $(POLICIES) $(EXECUTABLE)
