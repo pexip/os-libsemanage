@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2004-2006 Tresys Technology, LLC
  * Copyright (C) 2005 Red Hat, Inc.
- * 
+ *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
  *  License as published by the Free Software Foundation; either
@@ -104,7 +104,7 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 static int semanage_direct_remove_key(semanage_handle_t *sh,
 				      const semanage_module_key_t *modkey);
 
-static struct semanage_policy_table direct_funcs = {
+static const struct semanage_policy_table direct_funcs = {
 	.get_serial = semanage_direct_get_serial,
 	.destroy = semanage_direct_destroy,
 	.disconnect = semanage_direct_disconnect,
@@ -313,7 +313,7 @@ int semanage_direct_connect(semanage_handle_t * sh)
 		/* The file does not exist */
 		sepol_set_disable_dontaudit(sh->sepolh, 0);
 	} else {
-		ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+		ERR(sh, "Unable to access %s.", path);
 		goto err;
 	}
 
@@ -321,6 +321,7 @@ int semanage_direct_connect(semanage_handle_t * sh)
 
       err:
 	ERR(sh, "could not establish direct connection");
+	(void) semanage_direct_disconnect(sh);
 	return STATUS_ERR;
 }
 
@@ -456,17 +457,20 @@ static int write_file(semanage_handle_t * sh,
 	int out;
 
 	if ((out =
-	     open(filename, O_WRONLY | O_CREAT | O_TRUNC,
+	     open(filename, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
 		  S_IRUSR | S_IWUSR)) == -1) {
 		ERR(sh, "Could not open %s for writing.", filename);
 		return -1;
 	}
-	if (write(out, data, num_bytes) == -1) {
+	if (write_full(out, data, num_bytes) == -1) {
 		ERR(sh, "Error while writing to %s.", filename);
 		close(out);
 		return -1;
 	}
-	close(out);
+	if (close(out) == -1 && errno != EINTR) {
+		ERR(sh, "Error while closing %s.", filename);
+		return -1;
+	}
 	return 0;
 }
 
@@ -514,7 +518,7 @@ static int semanage_direct_update_user_extra(semanage_handle_t * sh, cil_db_t *c
 			goto cleanup;
 
 		pusers_extra->dtable->drop_cache(pusers_extra->dbase);
-		
+
 	} else {
 		retval =  pusers_extra->dtable->clear(sh, pusers_extra->dbase);
 	}
@@ -582,7 +586,7 @@ cleanup:
 static int read_from_pipe_to_data(semanage_handle_t *sh, size_t initial_len, int fd, char **out_data_read, size_t *out_read_len)
 {
 	size_t max_len = initial_len;
-	size_t read_len = 0;
+	ssize_t read_len;
 	size_t data_read_len = 0;
 	char *data_read = NULL;
 
@@ -591,19 +595,23 @@ static int read_from_pipe_to_data(semanage_handle_t *sh, size_t initial_len, int
 	}
 	data_read = malloc(max_len * sizeof(*data_read));
 	if (data_read == NULL) {
-		ERR(sh, "Failed to malloc, out of memory.\n");
+		ERR(sh, "Failed to malloc, out of memory.");
 		return -1;
 	}
 
 	while ((read_len = read(fd, data_read + data_read_len, max_len - data_read_len)) > 0) {
 		data_read_len += read_len;
 		if (data_read_len == max_len) {
+			char *tmp;
+
 			max_len *= 2;
-			data_read = realloc(data_read, max_len);
-			if (data_read == NULL) {
-				ERR(sh, "Failed to realloc, out of memory.\n");
+			tmp = realloc(data_read, max_len);
+			if (tmp == NULL) {
+				ERR(sh, "Failed to realloc, out of memory.");
+				free(data_read);
 				return -1;
 			}
+			data_read = tmp;
 		}
 	}
 
@@ -613,7 +621,7 @@ static int read_from_pipe_to_data(semanage_handle_t *sh, size_t initial_len, int
 	return 0;
 }
 
-static int semanage_pipe_data(semanage_handle_t *sh, char *path, char *in_data, size_t in_data_len, char **out_data, size_t *out_data_len, char **err_data, size_t *err_data_len)
+static int semanage_pipe_data(semanage_handle_t *sh, const char *path, const char *in_data, size_t in_data_len, char **out_data, size_t *out_data_len, char **err_data, size_t *err_data_len)
 {
 	int input_fd[2] = {-1, -1};
 	int output_fd[2] = {-1, -1};
@@ -639,95 +647,95 @@ static int semanage_pipe_data(semanage_handle_t *sh, char *path, char *in_data, 
 	 */
 	sigaction(SIGPIPE, &new_signal, &old_signal);
 
-	retval = pipe(input_fd);
+	retval = pipe2(input_fd, O_CLOEXEC);
 	if (retval == -1) {
-		ERR(sh, "Unable to create pipe for input pipe: %s\n", strerror(errno));
+		ERR(sh, "Unable to create pipe for input pipe.");
 		goto cleanup;
 	}
-	retval = pipe(output_fd);
+	retval = pipe2(output_fd, O_CLOEXEC);
 	if (retval == -1) {
-		ERR(sh, "Unable to create pipe for output pipe: %s\n", strerror(errno));
+		ERR(sh, "Unable to create pipe for output pipe.");
 		goto cleanup;
 	}
-	retval = pipe(err_fd);
+	retval = pipe2(err_fd, O_CLOEXEC);
 	if (retval == -1) {
-		ERR(sh, "Unable to create pipe for error pipe: %s\n", strerror(errno));
+		ERR(sh, "Unable to create pipe for error pipe.");
 		goto cleanup;
 	}
 
 	pid = fork();
 	if (pid == -1) {
-		ERR(sh, "Unable to fork from parent: %s.", strerror(errno));
+		ERR(sh, "Unable to fork from parent.");
 		retval = -1;
 		goto cleanup;
 	} else if (pid == 0) {
 		retval = dup2(input_fd[PIPE_READ], STDIN_FILENO);
 		if (retval == -1) {
-			ERR(sh, "Unable to dup2 input pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to dup2 input pipe.");
 			goto cleanup;
 		}
 		retval = dup2(output_fd[PIPE_WRITE], STDOUT_FILENO);
 		if (retval == -1) {
-			ERR(sh, "Unable to dup2 output pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to dup2 output pipe.");
 			goto cleanup;
 		}
 		retval = dup2(err_fd[PIPE_WRITE], STDERR_FILENO);
 		if (retval == -1) {
-			ERR(sh, "Unable to dup2 error pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to dup2 error pipe.");
 			goto cleanup;
 		}
 
 		retval = close(input_fd[PIPE_WRITE]);
 		if (retval == -1) {
-			ERR(sh, "Unable to close input pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close input pipe.");
 			goto cleanup;
 		}
 		retval = close(output_fd[PIPE_READ]);
 		if (retval == -1) {
-			ERR(sh, "Unable to close output pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close output pipe.");
 			goto cleanup;
 		}
 		retval = close(err_fd[PIPE_READ]);
 		if (retval == -1) {
-			ERR(sh, "Unable to close error pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close error pipe.");
 			goto cleanup;
 		}
 		retval = execl(path, path, NULL);
 		if (retval == -1) {
-			ERR(sh, "Unable to execute %s : %s\n", path, strerror(errno));
+			ERR(sh, "Unable to execute %s.", path);
 			_exit(EXIT_FAILURE);
 		}
 	} else {
 		retval = close(input_fd[PIPE_READ]);
 		input_fd[PIPE_READ] = -1;
 		if (retval == -1) {
-			ERR(sh, "Unable to close read end of input pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close read end of input pipe.");
 			goto cleanup;
 		}
 
 		retval = close(output_fd[PIPE_WRITE]);
 		output_fd[PIPE_WRITE] = -1;
 		if (retval == -1) {
-			ERR(sh, "Unable to close write end of output pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close write end of output pipe.");
 			goto cleanup;
 		}
 
 		retval = close(err_fd[PIPE_WRITE]);
 		err_fd[PIPE_WRITE] = -1;
 		if (retval == -1) {
-			ERR(sh, "Unable to close write end of error pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close write end of error pipe.");
 			goto cleanup;
 		}
 
-		retval = write(input_fd[PIPE_WRITE], in_data, in_data_len);
+		retval = write_full(input_fd[PIPE_WRITE], in_data, in_data_len);
 		if (retval == -1) {
-			ERR(sh, "Failed to write data to input pipe: %s\n", strerror(errno));
+			ERR(sh, "Failed to write data to input pipe.");
 			goto cleanup;
 		}
 		retval = close(input_fd[PIPE_WRITE]);
 		input_fd[PIPE_WRITE] = -1;
 		if (retval == -1) {
-			ERR(sh, "Unable to close write end of input pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close write end of input pipe.");
 			goto cleanup;
 		}
 
@@ -739,7 +747,7 @@ static int semanage_pipe_data(semanage_handle_t *sh, char *path, char *in_data, 
 		retval = close(output_fd[PIPE_READ]);
 		output_fd[PIPE_READ] = -1;
 		if (retval == -1) {
-			ERR(sh, "Unable to close read end of output pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close read end of output pipe.");
 			goto cleanup;
 		}
 
@@ -751,7 +759,7 @@ static int semanage_pipe_data(semanage_handle_t *sh, char *path, char *in_data, 
 		retval = close(err_fd[PIPE_READ]);
 		err_fd[PIPE_READ] = -1;
 		if (retval == -1) {
-			ERR(sh, "Unable to close read end of error pipe: %s\n", strerror(errno));
+			ERR(sh, "Unable to close read end of error pipe.");
 			goto cleanup;
 		}
 
@@ -821,7 +829,7 @@ static int semanage_direct_write_langext(semanage_handle_t *sh,
 		goto cleanup;
 	}
 
-	fp = fopen(fn, "w");
+	fp = fopen(fn, "we");
 	if (fp == NULL) {
 		ERR(sh, "Unable to open %s module ext file.", modinfo->name);
 		ret = -1;
@@ -834,7 +842,7 @@ static int semanage_direct_write_langext(semanage_handle_t *sh,
 		goto cleanup;
 	}
 
-	if (fclose(fp) != 0) {
+	if (fclose(fp) != 0 && errno != EINTR) {
 		ERR(sh, "Unable to close %s module ext file.", modinfo->name);
 		fp = NULL;
 		ret = -1;
@@ -861,6 +869,14 @@ static void update_checksum_with_len(Sha256Context *context, size_t s)
 		s >>= 8;
 	}
 	Sha256Update(context, buffer, 8);
+}
+
+static void update_checksum_with_bool(Sha256Context *context, bool b)
+{
+	uint8_t byte;
+
+	byte = b ? UINT8_C(1) : UINT8_C(0);
+	Sha256Update(context, &byte, 1);
 }
 
 static int semanage_compile_module(semanage_handle_t *sh,
@@ -910,7 +926,7 @@ static int semanage_compile_module(semanage_handle_t *sh,
 
 	status = map_compressed_file(sh, hll_path, &hll_contents);
 	if (status < 0) {
-		ERR(sh, "Unable to read file %s\n", hll_path);
+		ERR(sh, "Unable to read file %s.", hll_path);
 		goto cleanup;
 	}
 
@@ -920,16 +936,13 @@ static int semanage_compile_module(semanage_handle_t *sh,
 	if (err_data_len > 0) {
 		for (start = end = err_data; end < err_data + err_data_len; end++) {
 			if (*end == '\n') {
-				fprintf(stderr, "%s: ", modinfo->name);
-				fwrite(start, 1, end - start + 1, stderr);
+				ERR(sh, "%s: %.*s.", modinfo->name, (int)(end - start + 1), start);
 				start = end + 1;
 			}
 		}
 
 		if (end != start) {
-			fprintf(stderr, "%s: ", modinfo->name);
-			fwrite(start, 1, end - start, stderr);
-			fprintf(stderr, "\n");
+			ERR(sh, "%s: %.*s.", modinfo->name, (int)(end - start), start);
 		}
 	}
 	if (status != 0) {
@@ -943,14 +956,14 @@ static int semanage_compile_module(semanage_handle_t *sh,
 
 	status = write_compressed_file(sh, cil_path, cil_data, cil_data_len);
 	if (status == -1) {
-		ERR(sh, "Failed to write %s\n", cil_path);
+		ERR(sh, "Failed to write %s.", cil_path);
 		goto cleanup;
 	}
 
 	if (sh->conf->remove_hll == 1) {
 		status = unlink(hll_path);
 		if (status != 0) {
-			ERR(sh, "Error while removing HLL file %s: %s", hll_path, strerror(errno));
+			ERR(sh, "Error while removing HLL file %s.", hll_path);
 			goto cleanup;
 		}
 
@@ -977,15 +990,23 @@ static int modinfo_cmp(const void *a, const void *b)
 	return strcmp(ma->name, mb->name);
 }
 
+struct extra_checksum_params {
+	int disable_dontaudit;
+	int preserve_tunables;
+	int target_platform;
+	int policyvers;
+};
+
 static int semanage_compile_hll_modules(semanage_handle_t *sh,
 					semanage_module_info_t *modinfos,
 					int num_modinfos,
+					const struct extra_checksum_params *extra,
 					char *cil_checksum)
 {
 	/* to be incremented when checksum input data format changes */
-	static const size_t CHECKSUM_EPOCH = 1;
+	static const size_t CHECKSUM_EPOCH = 2;
 
-	int i, status = 0;
+	int i, status;
 	char cil_path[PATH_MAX];
 	struct stat sb;
 	Sha256Context context;
@@ -1000,6 +1021,10 @@ static int semanage_compile_hll_modules(semanage_handle_t *sh,
 
 	Sha256Initialise(&context);
 	update_checksum_with_len(&context, CHECKSUM_EPOCH);
+	update_checksum_with_bool(&context, !!extra->disable_dontaudit);
+	update_checksum_with_bool(&context, !!extra->preserve_tunables);
+	update_checksum_with_len(&context, (size_t)extra->target_platform);
+	update_checksum_with_len(&context, (size_t)extra->policyvers);
 
 	/* prefix with module count to avoid collisions */
 	update_checksum_with_len(&context, num_modinfos);
@@ -1029,8 +1054,7 @@ static int semanage_compile_hll_modules(semanage_handle_t *sh,
 				unmap_compressed_file(&contents);
 				continue;
 			} else if (errno != ENOENT) {
-				ERR(sh, "Unable to access %s: %s\n", cil_path,
-				    strerror(errno));
+				ERR(sh, "Unable to access %s.", cil_path);
 				return -1; //an error in the "stat" call
 			}
 		}
@@ -1052,10 +1076,10 @@ static int semanage_compare_checksum(semanage_handle_t *sh, const char *referenc
 	int fd, retval;
 	char *data;
 
-	fd = open(path, O_RDONLY);
+	fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd == -1) {
 		if (errno != ENOENT) {
-			ERR(sh, "Unable to open %s: %s\n", path, strerror(errno));
+			ERR(sh, "Unable to open %s.", path);
 			return -1;
 		}
 		/* Checksum file not present - force a rebuild. */
@@ -1063,21 +1087,21 @@ static int semanage_compare_checksum(semanage_handle_t *sh, const char *referenc
 	}
 
 	if (fstat(fd, &sb) == -1) {
-		ERR(sh, "Unable to stat %s\n", path);
+		ERR(sh, "Unable to stat %s.", path);
 		retval = -1;
 		goto out_close;
 	}
 
 	if (sb.st_size != (off_t)CHECKSUM_CONTENT_SIZE) {
 		/* Incompatible/invalid hash type - just force a rebuild. */
-		WARN(sh, "Module checksum invalid - forcing a rebuild\n");
+		WARN(sh, "Module checksum invalid - forcing a rebuild.");
 		retval = 1;
 		goto out_close;
 	}
 
 	data = mmap(NULL, CHECKSUM_CONTENT_SIZE, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (data == MAP_FAILED) {
-		ERR(sh, "Unable to mmap %s\n", path);
+		ERR(sh, "Unable to mmap %s.", path);
 		retval = -1;
 		goto out_close;
 	}
@@ -1110,8 +1134,8 @@ static const int semanage_computed_files[] = {
 /* Copies a file from src to dst. If dst already exists then
  * overwrite it. If source doesn't exist then return success.
  * Returns 0 on success, -1 on error. */
-static int copy_file_if_exists(const char *src, const char *dst, mode_t mode){
-	int rc = semanage_copy_file(src, dst, mode, false);
+static int copy_file_if_exists(semanage_handle_t *sh, const char *src, const char *dst, mode_t mode){
+	int rc = semanage_copy_file(sh, src, dst, mode, false);
 	return (rc < 0 && errno != ENOENT) ? rc : 0;
 }
 
@@ -1134,6 +1158,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	mode_t mask = umask(0077);
 	struct stat sb;
 	char modules_checksum[CHECKSUM_CONTENT_SIZE + 1 /* '\0' */];
+	struct extra_checksum_params extra;
 
 	int do_rebuild, do_write_kernel, do_install;
 	int fcontexts_modified, ports_modified, seusers_modified,
@@ -1186,15 +1211,15 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 		/* The file does not exist */
 		do_rebuild |= (sepol_get_disable_dontaudit(sh->sepolh) == 1);
 	} else {
-		ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+		ERR(sh, "Unable to access %s.", path);
 		retval = -1;
 		goto cleanup;
 	}
 	if (sepol_get_disable_dontaudit(sh->sepolh) == 1) {
 		FILE *touch;
-		touch = fopen(path, "w");
+		touch = fopen(path, "we");
 		if (touch != NULL) {
-			if (fclose(touch) != 0) {
+			if (fclose(touch) != 0 && errno != EINTR) {
 				ERR(sh, "Error attempting to create disable_dontaudit flag.");
 				goto cleanup;
 			}
@@ -1217,16 +1242,16 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 		/* The file does not exist */
 		do_rebuild |= (sepol_get_preserve_tunables(sh->sepolh) == 1);
 	} else {
-		ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+		ERR(sh, "Unable to access %s.", path);
 		retval = -1;
 		goto cleanup;
 	}
 
 	if (sepol_get_preserve_tunables(sh->sepolh) == 1) {
 		FILE *touch;
-		touch = fopen(path, "w");
+		touch = fopen(path, "we");
 		if (touch != NULL) {
-			if (fclose(touch) != 0) {
+			if (fclose(touch) != 0 && errno != EINTR) {
 				ERR(sh, "Error attempting to create preserve_tunable flag.");
 				goto cleanup;
 			}
@@ -1253,7 +1278,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 		path = semanage_path(SEMANAGE_TMP, semanage_computed_files[i]);
 		if (stat(path, &sb) != 0) {
 			if (errno != ENOENT) {
-				ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+				ERR(sh, "Unable to access %s.", path);
 				retval = -1;
 				goto cleanup;
 			}
@@ -1274,10 +1299,16 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 			goto cleanup;
 		}
 
+		extra = (struct extra_checksum_params){
+			.disable_dontaudit = sepol_get_disable_dontaudit(sh->sepolh),
+			.preserve_tunables = sepol_get_preserve_tunables(sh->sepolh),
+			.target_platform = sh->conf->target_platform,
+			.policyvers = sh->conf->policyvers,
+		};
 		retval = semanage_compile_hll_modules(sh, modinfos, num_modinfos,
-						      modules_checksum);
+						      &extra, modules_checksum);
 		if (retval < 0) {
-			ERR(sh, "Failed to compile hll files into cil files.\n");
+			ERR(sh, "Failed to compile hll files into cil files.");
 			goto cleanup;
 		}
 
@@ -1290,7 +1321,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 
 		retval = semanage_write_modules_checksum(sh, modules_checksum);
 		if (retval < 0) {
-			ERR(sh, "Failed to write module checksum file.\n");
+			ERR(sh, "Failed to write module checksum file.");
 			goto cleanup;
 		}
 	}
@@ -1319,9 +1350,12 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 		cil_set_preserve_tunables(cildb, preserve_tunables);
 		cil_set_target_platform(cildb, sh->conf->target_platform);
 		cil_set_policy_version(cildb, sh->conf->policyvers);
+		cil_set_multiple_decls(cildb, sh->conf->multiple_decls);
 
 		if (sh->conf->handle_unknown != -1) {
-			cil_set_handle_unknown(cildb, sh->conf->handle_unknown);
+			retval = cil_set_handle_unknown(cildb, sh->conf->handle_unknown);
+			if (retval < 0)
+				goto cleanup;
 		}
 
 		retval = semanage_load_files(sh, cildb, mod_filenames, num_modinfos);
@@ -1398,7 +1432,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 
 		path = semanage_path(SEMANAGE_TMP, SEMANAGE_SEUSERS_LINKED);
 		if (stat(path, &sb) == 0) {
-			retval = semanage_copy_file(path,
+			retval = semanage_copy_file(sh, path,
 						    semanage_path(SEMANAGE_TMP,
 								  SEMANAGE_STORE_SEUSERS),
 						    0, false);
@@ -1409,14 +1443,14 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 			/* The file does not exist */
 			pseusers->dtable->clear(sh, pseusers->dbase);
 		} else {
-			ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+			ERR(sh, "Unable to access %s.", path);
 			retval = -1;
 			goto cleanup;
 		}
 
 		path = semanage_path(SEMANAGE_TMP, SEMANAGE_USERS_EXTRA_LINKED);
 		if (stat(path, &sb) == 0) {
-			retval = semanage_copy_file(path,
+			retval = semanage_copy_file(sh, path,
 						    semanage_path(SEMANAGE_TMP,
 								  SEMANAGE_USERS_EXTRA),
 						    0, false);
@@ -1427,7 +1461,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 			/* The file does not exist */
 			pusers_extra->dtable->clear(sh, pusers_extra->dbase);
 		} else {
-			ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+			ERR(sh, "Unable to access %s.", path);
 			retval = -1;
 			goto cleanup;
 		}
@@ -1437,13 +1471,15 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	 * Determine what else needs to be done.
 	 * We need to write the kernel policy if we are rebuilding
 	 * or if any other policy component that lives in the kernel
-	 * policy has been modified.
+	 * policy has been modified. We also want to force it when
+	 * check_ext_changes was specified as the various dbases may have
+	 * changes as well.
 	 * We need to install the policy files if any of the managed files
 	 * that live under /etc/selinux (kernel policy, seusers, file contexts)
 	 * will be modified.
 	 */
-	do_write_kernel = do_rebuild | ports_modified | ibpkeys_modified |
-		ibendports_modified |
+	do_write_kernel = do_rebuild | sh->check_ext_changes |
+		ports_modified | ibpkeys_modified | ibendports_modified |
 		bools->dtable->is_modified(bools->dbase) |
 		ifaces->dtable->is_modified(ifaces->dbase) |
 		nodes->dtable->is_modified(nodes->dbase) |
@@ -1480,8 +1516,8 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	/* ======= Post-process: Validate non-policydb components ===== */
 
 	/* Validate local modifications to file contexts.
-	 * Note: those are still cached, even though they've been 
-	 * merged into the main file_contexts. We won't check the 
+	 * Note: those are still cached, even though they've been
+	 * merged into the main file_contexts. We won't check the
 	 * large file_contexts - checked at compile time */
 	if (do_rebuild || fcontexts_modified) {
 		retval = semanage_fcontext_validate_local(sh, out);
@@ -1523,28 +1559,28 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 	if (retval < 0)
 		goto cleanup;
 
-	retval = semanage_copy_file(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_KERNEL),
+	retval = semanage_copy_file(sh, semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_KERNEL),
 			semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_KERNEL),
 			sh->conf->file_mode, false);
 	if (retval < 0) {
 		goto cleanup;
 	}
 
-	retval = copy_file_if_exists(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_LOCAL),
+	retval = copy_file_if_exists(sh, semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_LOCAL),
 						semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_FC_LOCAL),
 						sh->conf->file_mode);
 	if (retval < 0) {
 		goto cleanup;
 	}
 
-	retval = copy_file_if_exists(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC),
+	retval = copy_file_if_exists(sh, semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC),
 						semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_FC),
 						sh->conf->file_mode);
 	if (retval < 0) {
 		goto cleanup;
 	}
 
-	retval = copy_file_if_exists(semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS),
+	retval = copy_file_if_exists(sh, semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_SEUSERS),
 						semanage_final_path(SEMANAGE_FINAL_TMP, SEMANAGE_SEUSERS),
 						sh->conf->file_mode);
 	if (retval < 0) {
@@ -1562,6 +1598,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
 			}
 			/* file_contexts.homedirs was created in SEMANAGE_TMP store */
 			retval = semanage_copy_file(
+						sh,
 						semanage_path(SEMANAGE_TMP, SEMANAGE_STORE_FC_HOMEDIRS),
 						semanage_final_path(SEMANAGE_FINAL_TMP,	SEMANAGE_FC_HOMEDIRS),
 						sh->conf->file_mode, false);
@@ -1574,7 +1611,7 @@ static int semanage_direct_commit(semanage_handle_t * sh)
                                See /etc/selinux/semanage.conf if you need to enable it.");
         }
 
-	/* free out, if we don't free it before calling semanage_install_sandbox 
+	/* free out, if we don't free it before calling semanage_install_sandbox
 	 * then fork() may fail on low memory machines */
 	sepol_policydb_free(out);
 	out = NULL;
@@ -1686,8 +1723,8 @@ static int semanage_direct_install_file(semanage_handle_t * sh,
 
 	int retval = -1;
 	char *path = NULL;
-	char *filename;
-	char *lang_ext = NULL;
+	const char *filename;
+	const char *lang_ext = NULL;
 	char *module_name = NULL;
 	char *separator;
 	char *version = NULL;
@@ -1695,13 +1732,13 @@ static int semanage_direct_install_file(semanage_handle_t * sh,
 
 	retval = map_compressed_file(sh, install_filename, &contents);
 	if (retval < 0) {
-		ERR(sh, "Unable to read file %s\n", install_filename);
+		ERR(sh, "Unable to read file %s.", install_filename);
 		goto cleanup;
 	}
 
 	path = strdup(install_filename);
 	if (path == NULL) {
-		ERR(sh, "No memory available for strdup.\n");
+		ERR(sh, "No memory available for strdup.");
 		retval = -1;
 		goto cleanup;
 	}
@@ -1742,12 +1779,12 @@ static int semanage_direct_install_file(semanage_handle_t * sh,
 	if (module_name == NULL) {
 		module_name = strdup(filename);
 		if (module_name == NULL) {
-			ERR(sh, "No memory available for module_name.\n");
+			ERR(sh, "No memory available for module_name.");
 			retval = -1;
 			goto cleanup;
 		}
 	} else if (strcmp(module_name, filename) != 0) {
-		fprintf(stderr, "Warning: SELinux userspace will refer to the module from %s as %s rather than %s\n", install_filename, module_name, filename);
+		ERR(sh, "Warning: SELinux userspace will refer to the module from %s as %s rather than %s.", install_filename, module_name, filename);
 	}
 
 	retval = semanage_direct_install(sh, contents.data, contents.len,
@@ -1788,7 +1825,7 @@ static int semanage_direct_extract(semanage_handle_t * sh,
 	}
 
 	if (stat(module_path, &sb) != 0) {
-		ERR(sh, "Unable to access %s: %s\n", module_path, strerror(errno));
+		ERR(sh, "Unable to access %s.", module_path);
 		rc = -1;
 		goto cleanup;
 	}
@@ -1819,7 +1856,7 @@ static int semanage_direct_extract(semanage_handle_t * sh,
 
 	if (extract_cil == 1 && strcmp(_modinfo->lang_ext, "cil") && stat(input_file, &sb) != 0) {
 		if (errno != ENOENT) {
-			ERR(sh, "Unable to access %s: %s\n", input_file, strerror(errno));
+			ERR(sh, "Unable to access %s.", input_file);
 			rc = -1;
 			goto cleanup;
 		}
@@ -1922,11 +1959,6 @@ static int semanage_direct_list(semanage_handle_t * sh,
 		goto cleanup;
 	}
 
-	if (num_modules == 0) {
-		retval = semanage_direct_get_serial(sh);
-		goto cleanup;
-	}
-
 	retval = semanage_direct_get_serial(sh);
 
       cleanup:
@@ -1984,7 +2016,7 @@ static int semanage_direct_get_enabled(semanage_handle_t *sh,
 
 	if (stat(path, &sb) < 0) {
 		if (errno != ENOENT) {
-			ERR(sh, "Unable to access %s: %s\n", path, strerror(errno));
+			ERR(sh, "Unable to access %s.", path);
 			status = -1;
 			goto cleanup;
 		}
@@ -2078,7 +2110,7 @@ static int semanage_direct_set_enabled(semanage_handle_t *sh,
 	switch (enabled) {
 		case 0: /* disable the module */
 			mask = umask(0077);
-			fp = fopen(fn, "w");
+			fp = fopen(fn, "we");
 			umask(mask);
 
 			if (fp == NULL) {
@@ -2091,7 +2123,7 @@ static int semanage_direct_set_enabled(semanage_handle_t *sh,
 
 			ret = fclose(fp);
 			fp = NULL;
-			if (ret != 0) {
+			if (ret != 0 && errno != EINTR) {
 				ERR(sh,
 				    "Unable to close disabled file for module %s",
 				    modkey->name);
@@ -2179,7 +2211,7 @@ static int semanage_direct_get_module_info(semanage_handle_t *sh,
 
 	semanage_module_info_t *modinfos = NULL;
 	int modinfos_len = 0;
-	semanage_module_info_t *highest = NULL;
+	const semanage_module_info_t *highest = NULL;
 
 	/* check module name */
 	ret = semanage_module_validate_name(modkey->name);
@@ -2265,7 +2297,7 @@ static int semanage_direct_get_module_info(semanage_handle_t *sh,
 		goto cleanup;
 	}
 
-	fp = fopen(fn, "r");
+	fp = fopen(fn, "re");
 
 	if (fp == NULL) {
 		ERR(sh,
@@ -2292,7 +2324,7 @@ static int semanage_direct_get_module_info(semanage_handle_t *sh,
 	free(tmp);
 	tmp = NULL;
 
-	if (fclose(fp) != 0) {
+	if (fclose(fp) != 0 && errno != EINTR) {
 		fp = NULL;
 		ERR(sh,
 		    "Unable to close %s module lang ext file.",
@@ -2317,7 +2349,7 @@ static int semanage_direct_get_module_info(semanage_handle_t *sh,
 	/* set enabled/disabled status */
 	if (stat(fn, &sb) < 0) {
 		if (errno != ENOENT) {
-			ERR(sh, "Unable to access %s: %s\n", fn, strerror(errno));
+			ERR(sh, "Unable to access %s.", fn);
 			status = -1;
 			goto cleanup;
 		}
@@ -2706,7 +2738,7 @@ cleanup:
 		if (modinfos != NULL) {
 			for (i = 0; i < *modinfos_len; i++) {
 				semanage_module_info_destroy(
-						sh, 
+						sh,
 						&(*modinfos)[i]);
 			}
 			free(*modinfos);
@@ -2730,7 +2762,6 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 	int status = 0;
 	int ret = 0;
 	int type;
-	struct stat sb;
 
 	char path[PATH_MAX];
 	mode_t mask = umask(0077);
@@ -2746,7 +2777,7 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 	/* validate module info */
 	ret = semanage_module_info_validate(modinfo);
 	if (ret != 0) {
-		ERR(sh, "%s failed module validation.\n", modinfo->name);
+		ERR(sh, "%s failed module validation.", modinfo->name);
 		status = -2;
 		goto cleanup;
 	}
@@ -2817,7 +2848,7 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 		status = -3;
 		goto cleanup;
 	}
-	
+
 	/* if this is an HLL, delete the CIL cache if it exists so it will get recompiled */
 	if (type == SEMANAGE_MODULE_PATH_HLL) {
 		ret = semanage_module_get_path(
@@ -2831,13 +2862,11 @@ static int semanage_direct_install_info(semanage_handle_t *sh,
 			goto cleanup;
 		}
 
-		if (stat(path, &sb) == 0) {
-			ret = unlink(path);
-			if (ret != 0) {
-				ERR(sh, "Error while removing cached CIL file %s: %s", path, strerror(errno));
-				status = -3;
-				goto cleanup;
-			}
+		ret = unlink(path);
+		if (ret != 0 && errno != ENOENT) {
+			ERR(sh, "Error while removing cached CIL file %s.", path);
+			status = -3;
+			goto cleanup;
 		}
 	}
 
@@ -2934,13 +2963,10 @@ static int semanage_direct_remove_key(semanage_handle_t *sh,
 			goto cleanup;
 		}
 
-		struct stat sb;
-		if (stat(path, &sb) == 0) {
-			ret = unlink(path);
-			if (ret != 0) {
-				status = -1;
-				goto cleanup;
-			}
+		ret = unlink(path);
+		if (ret != 0 && errno != ENOENT) {
+			status = -1;
+			goto cleanup;
 		}
 	}
 	else {
@@ -2963,4 +2989,3 @@ cleanup:
 
 	return status;
 }
-

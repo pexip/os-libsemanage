@@ -26,6 +26,7 @@
 #include <selinux/selinux.h>
 #include <semanage/handle.h>
 
+#include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +60,7 @@ static int parse_errors;
         char *s;
 }
 
-%token MODULE_STORE VERSION EXPAND_CHECK FILE_MODE SAVE_PREVIOUS SAVE_LINKED TARGET_PLATFORM COMPILER_DIR IGNORE_MODULE_CACHE STORE_ROOT OPTIMIZE_POLICY
+%token MODULE_STORE VERSION EXPAND_CHECK FILE_MODE SAVE_PREVIOUS SAVE_LINKED TARGET_PLATFORM COMPILER_DIR IGNORE_MODULE_CACHE STORE_ROOT OPTIMIZE_POLICY MULTIPLE_DECLS
 %token LOAD_POLICY_START SETFILES_START SEFCONTEXT_COMPILE_START DISABLE_GENHOMEDIRCON HANDLE_UNKNOWN USEPASSWD IGNOREDIRS
 %token BZIP_BLOCKSIZE BZIP_SMALL REMOVE_HLL
 %token VERIFY_MOD_START VERIFY_LINKED_START VERIFY_KERNEL_START BLOCK_END
@@ -96,6 +97,7 @@ single_opt:     module_store
 	|	bzip_small
 	|	remove_hll
 	|	optimize_policy
+	|	multiple_decls
         ;
 
 module_store:   MODULE_STORE '=' ARG {
@@ -139,13 +141,15 @@ ignore_module_cache:	IGNORE_MODULE_CACHE '=' ARG  {
         ;
 
 version:        VERSION '=' ARG  {
-                        current_conf->policyvers = atoi($3);
+                        char *endptr;
+                        long value;
+                        errno = 0;
+                        value = strtol($3, &endptr, 10);
+                        if (*endptr != '\0' || errno != 0 || value < sepol_policy_kern_vers_min() || value > sepol_policy_kern_vers_max())
+                                yyerror("policy-version must be a valid policy version");
+                        else
+                                current_conf->policyvers = value;
                         free($3);
-                        if (current_conf->policyvers < sepol_policy_kern_vers_min() ||
-                            current_conf->policyvers > sepol_policy_kern_vers_max()) {
-                                parse_errors++;
-                                YYABORT;
-                        }
                 }
         ;
 
@@ -162,13 +166,27 @@ target_platform: TARGET_PLATFORM '=' ARG  {
         ;
 
 expand_check:   EXPAND_CHECK '=' ARG  {
-                        current_conf->expand_check = atoi($3);
+                        char *endptr;
+                        long value;
+                        errno = 0;
+                        value = strtol($3, &endptr, 10);
+                        if (*endptr != '\0' || errno != 0 || (value != 0 && value != 1))
+                                yyerror("expand-check can only be '1' or '0'");
+                        else
+                                current_conf->expand_check = value;
                         free($3);
                 }
         ;
 
 file_mode:   FILE_MODE '=' ARG  {
-                        current_conf->file_mode = strtoul($3, NULL, 8);
+                        char *endptr;
+                        long value;
+                        errno = 0;
+                        value = strtol($3, &endptr, 8);
+                        if (*endptr != '\0' || errno != 0 || value < 0 || value > 0777)
+                                yyerror("file-mode must be a valid permission mode");
+                        else
+                                current_conf->file_mode = value;
                         free($3);
                 }
         ;
@@ -177,7 +195,7 @@ save_previous:    SAVE_PREVIOUS '=' ARG {
 	                if (strcasecmp($3, "true") == 0)
 		                current_conf->save_previous = 1;
 			else if (strcasecmp($3, "false") == 0)
-				current_conf->save_previous = 0;		
+				current_conf->save_previous = 0;
 			else {
 				yyerror("save-previous can only be 'true' or 'false'");
 			}
@@ -190,7 +208,7 @@ save_linked:    SAVE_LINKED '=' ARG {
 	                if (strcasecmp($3, "true") == 0)
 		                current_conf->save_linked = 1;
 			else if (strcasecmp($3, "false") == 0)
-				current_conf->save_linked = 0;		
+				current_conf->save_linked = 0;
 			else {
 				yyerror("save-linked can only be 'true' or 'false'");
 			}
@@ -239,12 +257,15 @@ handle_unknown: HANDLE_UNKNOWN '=' ARG {
  }
 
 bzip_blocksize:  BZIP_BLOCKSIZE '=' ARG {
-	int blocksize = atoi($3);
-	free($3);
-	if (blocksize > 9)
+	char *endptr;
+	long value;
+	errno = 0;
+	value = strtol($3, &endptr, 10);
+	if (*endptr != '\0' || errno != 0 || value < 0 || value > 9)
 		yyerror("bzip-blocksize can only be in the range 0-9");
 	else
-		current_conf->bzip_blocksize = blocksize;
+		current_conf->bzip_blocksize = value;
+	free($3);
 }
 
 bzip_small:  BZIP_SMALL '=' ARG {
@@ -280,7 +301,18 @@ optimize_policy:  OPTIMIZE_POLICY '=' ARG {
 	free($3);
 }
 
-command_block: 
+multiple_decls:  MULTIPLE_DECLS '=' ARG {
+	if (strcasecmp($3, "false") == 0) {
+		current_conf->multiple_decls = 0;
+	} else if (strcasecmp($3, "true") == 0) {
+		current_conf->multiple_decls = 1;
+	} else {
+		yyerror("multiple-decls can only be 'true' or 'false'");
+	}
+	free($3);
+}
+
+command_block:
                 command_start external_opts BLOCK_END  {
                         if (new_external->path == NULL) {
                                 parse_errors++;
@@ -364,10 +396,17 @@ static int semanage_conf_init(semanage_conf_t * conf)
 	conf->bzip_small = 0;
 	conf->ignore_module_cache = 0;
 	conf->remove_hll = 0;
-	conf->optimize_policy = 0;
+	conf->optimize_policy = 1;
+	conf->multiple_decls = 1;
 
 	conf->save_previous = 0;
 	conf->save_linked = 0;
+
+	if (!conf->store_path ||
+	    !conf->store_root_path ||
+	    !conf->compiler_directory_path) {
+		return -1;
+	}
 
 	if ((conf->load_policy =
 	     calloc(1, sizeof(*(current_conf->load_policy)))) == NULL) {
@@ -429,7 +468,7 @@ semanage_conf_t *semanage_conf_parse(const char *config_filename)
 	if (semanage_conf_init(current_conf) == -1) {
 		goto cleanup;
 	}
-	if ((semanage_in = fopen(config_filename, "r")) == NULL) {
+	if ((semanage_in = fopen(config_filename, "re")) == NULL) {
 		/* configuration file does not exist or could not be
 		 * read.  THIS IS NOT AN ERROR.  just rely on the
 		 * defaults. */
